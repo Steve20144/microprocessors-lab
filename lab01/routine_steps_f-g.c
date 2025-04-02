@@ -5,13 +5,30 @@ int sum_mod7(int hash){
 	int sum = 0;
 	if (hash>9){
 		//creating the sum
-		while (hash!=0){			//to prevent further calculations after once the hash becomes a single digit
+		while (hash!=0){		//to prevent further calculations after once the hash becomes a single digit
 			sum = sum + hash % 10;	//adds to the sum the last digit of the hash
-			hash = hash / 10;			//removes the last digit of the hash (the one next to the last becomes last)
+			hash = hash / 10;	//removes the last digit of the hash (the one next to the last becomes last)
+			//Assembly-related:
+			// hash % 10 = hash - [10 * (hash / 10)]	//hash / 10 is an integer here, omitting any decimal points
+			
+			// hash / 10 = hash * [1/(2*5)] = hash * 4/5 * 1/2^2 * 1/2 = hash * 4/5 * 1/2^3
+			
+			// 4/5 will be a hex number [(2^32 / 10) + 1]
+			// 1/2^3 is LSLS (Logical Shift Left) 3 times
 		}
 		//modding by 7
 		sum = sum % 7;
 		return sum;	//0<=sum<7
+		//Assembly-related:
+		// sum % 7 = sum - [7 * (hash / 7)]	//sum / 7 is an integer here, omitting any decimal points
+		
+		// sum / 7 = sum * 6/7 * 1/6 = sum * 6/7 * 1/3 * 1/2
+		// sum / 3 = sum * 1/3 = sum * 2/3 * 1/2
+		// <=> sum / 7 = sum * 6/7 * (2/3 * 1/2) * 1/2 = sum * 6/7 * 2/3 * 1/2^2
+		
+		// 6/7 will be a hex number [(2^32 / 7) + 1]
+		// 2/3 will be a hex number [(2^32 / 3) + 1]
+		// 1/2^2 is LSLS (Logical Shift Left) 2 times
 	}
 	else{
 		return hash;	//0<=hash<=9
@@ -23,7 +40,7 @@ int main(){
 	return 0;
 }
 
-//KEIL Disassembler
+//KEIL Disassembler:
 //     21: int main(){ 
 // 0x080007AC B580      PUSH          {r7,lr}
 // 0x080007AE B082      SUB           sp,sp,#0x08
