@@ -5,50 +5,53 @@
 .data
 values:
 	.word 5, 12, 7, 6, 4, 11, 6, 3, 10, 23		//Table values
-	
-mov r1, #0					// Initialize counter (length = 0)
-mov r3, #0					// Initialize the capital letters additive
-mov r4, #0					// Initialize the lower case letters additive
-strlength:
-	push {r0}				// So that the starting address of the string gets preseved into memory
-	LDRB r2, [r0], #1		// Load R0 into R1 and then Post-increment r0 
-	CMP r2, #0				// Compare with null terminator
-	BEQ end					// If zero, exit loop
-	ADD r1, r1, #1			// Increment counter
-							// (b,c)
-	CMP r2, #41				// Compare with ASCII for 'A'
-	BLT strlength			// If r2 < 65 go to strlength
-	CMP r2, #5A				// Compare with ASCII for 'Z'
-	BGT lower			    // If r2 > 5A go to strlength
-	MLA r3, r2, #2, r3		// Add the ASCII of the letter multiplied by two
-	B strlength
-	
-lower:
-	CMP r2, #61				// Compare r2 with the 'a' ascii value.
-	BLT strlength			// If  r2 < 61 then go back to strlength
-	CMP r2, #7A				// Compare r2 with the 'z' ascii value
-	BGT strlength			// If  r2 > 7A then go back to strlength
-	RSB r5, r2, #97			// Subtract the ascii code from 97 (97 - r2)
-	MLA r4, r5, r5, r4		// Add into the accumulator the output of the subtraction and square.
-	B strlength
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-end:
-	pop {r0}
-	BX lr
-	
-
+		
+.text
 hashthestring:
 	.fnstart
-		bl strlength
-		cmp r0,
+	push {r4, r5, r6, r7, r8, lr}
+	mov r1, #0				//Initialize length counter
+	mov r3, #0				//Capital letters counter
+	mov r4, #0				//Lowercase letters counter
+	mov r5, r0				//Copy the pointer with the string to r5
+	mov r7, #0				//Number accumulator
+	
+loop:
+	ldrb r2, [r5], #1		//Load the string to r2 and increment pointer
+	cmp r2, #0				//Check for null terminator
+	beq end					//In case null terminator is reached, exit loop
+	add r1, r1, #1			//Increment length counter
+	
+	//Check uppercase
+	cmp r2, #'A'			//Compare the current character with 'A'
+	blt check_numbers		//If lower than 'A' branch to check_numbers
+	cmp r2, #'Z'			//Compare the current character with 'Z'
+	bgt lower_case			//If greater than 'Z' branch to lower_case
+	add r3, r3, r2, lsl #1 	//r3 += 2 * ASCII
+	b loop
+	
+lower_case:
+	cmp r2, #'a'			//Compare current character with 'a'
+	blt check_numbers		//If lower than 'a' proceed to check_numbers
+	cmp r2, #'z'			//Compare current character with 'z'
+	bgt check_numbers		//If gretaer than 'z' proceed to check_numbers
+	rsb r6, r6, #97			//r6 = 97 - ASCII
+	mul r6, r6, r6			//Square the result
+	add r4, r4, r6			//Add to lowercase additive (tbn accumulator)
+	b loop
+	
+check_numbers:
+	cmp r2, #'0'			//Compare current character with '0'
+	blt loop				//If lower than '0' branch to loop
+	cmp r2, #'9'			//Compare current character with '9'
+	bgt loop				//If greater than '9' branch to loop
+	ldr r8, =values			//Load base address of the array
+	ldr r8, [r8, r2, lsl #2]	//Load values[r2] into r8. lsl because one word is 4 bytes so we need to offset by that.
+	add r7, r7, r8			//Add the number to the numbers accumulator
+	b loop
+	
+
 	
 	.fnend
+
+	
