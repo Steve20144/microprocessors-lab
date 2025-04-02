@@ -45,6 +45,7 @@ int main(){
 // https://stackoverflow.com/questions/41183935/why-does-gcc-use-multiplication-by-a-strange-number-in-implementing-integer-divi
 // https://stackoverflow.com/questions/5558492/divide-by-10-using-bit-shifts
 // https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/divide-and-conquer
+// https://stackoverflow.com/questions/54950071/how-do-i-perform-modulus-on-arm7#54953169
 
 //KEIL Disassembler:
 //     21: int main(){ 
