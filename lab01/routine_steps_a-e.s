@@ -57,9 +57,31 @@ end:
 	add r1, r1, r7			//Add the numbers accumulator
 	mov r0, r1	
 	pop {r4, r5, r6, r7, r8, lr}
-	bx lr
+	b addandmod
 	
-		
+addandmod:
+	push {lr, r4, r5, r6, r7, r8}
+	mov r6, #0				//Initialize mod accumulator
+	cmp r0, #9;
+	blt exit
+	mov r4, #10				//Load 10 for the mod
+	//extract the digits
+extract_digits:
+	
+	udiv r5, r0, r4			//r5=hash/10
+	cmp r5, #9				//Compare r5 with 9
+	blt exit				//In case r5 is less than 9 exit
+	mls r4, r4, r5, r0		//r4 = hash % 10
+	add r6, r6, r4			//Add the digit to the accumulator
+	b extract_digits
+	
+	
+exit:
+	mov r7, #7				//Load 7 into r7 for mod
+	udiv r8, r6, r7			// r8 = r6/7
+	mls r0, r8, r7, r6 		//r0 = r6 % 7 where r6 is the sum of the digits
+	pop {lr, r4, r5, r6, r7, r8}
+	bx lr
 
 	
 	.fnend
