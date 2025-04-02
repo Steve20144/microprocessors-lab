@@ -1,8 +1,11 @@
 .global hashthestring
+.global addandmod
 .p2align 1
 .type hashthestring, %function
-	
+.type addandmod, %function
 .data
+.global hashresult	 		//Make the symbol visible to the linker
+hashresult: .word 0			//Allocate 4 bytes initialized to 0
 values:
 	.word 5, 12, 7, 6, 4, 11, 6, 3, 10, 23		//Table values
 		
@@ -55,13 +58,18 @@ end:
 	add r1, r1, r3			//Add the capital letters counter
 	add r1, r1, r4			//Add the lowercase letters counter
 	add r1, r1, r7			//Add the numbers accumulator
-	mov r0, r1	
+	ldr r3, =hashresult		//Load the hashresult into r3
+	str r1, [r3]			//Store the hash into hashresult
 	pop {r4, r5, r6, r7, r8, lr}
-	b addandmod
+	bx lr
+	.fnend
 	
 addandmod:
-	push {lr, r4, r5, r6, r7, r8}
+	.fnstart
+	push {r4, r5, r6, r7, r8, lr}
 	mov r6, #0				//Initialize mod accumulator
+	ldr r0, =hashresult		//Load memory address of hashresult from previous process
+	ldr r0, [r0]			//Load the content of hashresult
 	cmp r0, #9;
 	blt exit
 	mov r4, #10				//Load 10 for the mod
@@ -80,7 +88,7 @@ exit:
 	mov r7, #7				//Load 7 into r7 for mod
 	udiv r8, r6, r7			// r8 = r6/7
 	mls r0, r8, r7, r6 		//r0 = r6 % 7 where r6 is the sum of the digits
-	pop {lr, r4, r5, r6, r7, r8}
+	pop {r4, r5, r6, r7, r8, lr}
 	bx lr
 
 	
