@@ -40,6 +40,12 @@ int main(){
 	return 0;
 }
 
+// Sources:
+// https://stackoverflow.com/questions/19844575/how-to-do-division-in-arm
+// https://stackoverflow.com/questions/41183935/why-does-gcc-use-multiplication-by-a-strange-number-in-implementing-integer-divi
+// https://stackoverflow.com/questions/5558492/divide-by-10-using-bit-shifts
+// https://community.arm.com/arm-community-blogs/b/architectures-and-processors-blog/posts/divide-and-conquer
+
 //KEIL Disassembler:
 //     21: int main(){ 
 // 0x080007AC B580      PUSH          {r7,lr}
