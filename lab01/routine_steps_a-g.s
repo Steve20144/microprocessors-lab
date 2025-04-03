@@ -1,8 +1,10 @@
 .global hashthestring
 .global addandmod
+.global fibonacci
 .p2align 1
 .type hashthestring, %function
 .type addandmod, %function
+.type fibonacci, %function
 .data
 .global hashresult	 		//Make the symbol visible to the linker
 hashresult: .word 0			//Allocate 4 bytes initialized to 0
@@ -65,33 +67,60 @@ end:
 	.fnend
 	
 addandmod:
-	.fnstart
-	push {r4, r5, r6, r7, r8, lr}
-	mov r6, #0				//Initialize mod accumulator
-	ldr r0, =hashresult		//Load memory address of hashresult from previous process
-	ldr r0, [r0]			//Load the content of hashresult
-	cmp r0, #9;
-	blt exit
-	mov r4, #10				//Load 10 for the mod
-	//extract the digits
-extract_digits:
-	
-	udiv r5, r0, r4			//r5=hash/10
-	cmp r5, #9				//Compare r5 with 9
-	blt exit				//In case r5 is less than 9 exit
-	mls r4, r4, r5, r0		//r4 = hash % 10
-	add r6, r6, r4			//Add the digit to the accumulator
-	b extract_digits
-	
-	
-exit:
-	mov r7, #7				//Load 7 into r7 for mod
-	udiv r8, r6, r7			// r8 = r6/7
-	mls r0, r8, r7, r6 		//r0 = r6 % 7 where r6 is the sum of the digits
-	pop {r4, r5, r6, r7, r8, lr}
-	bx lr
+    .fnstart
+    push {r4, r5, r6, r7, r8, lr}
+    mov r6, #0                  // Initialize digit sum accumulator
+    ldr r0, =hashresult         // Load address of hashresult
+    ldr r0, [r0]                // Load value of hashresult into r0
+	cmp r0, #9					// Compare loaded value with 9
+	blt exit9					// If loaded value is less than 9 go to exit9
+    mov r4, #10                 // Preserve divisor (10) in r4
+    mov r8, #0                  // Temporary register for remainder
 
+extract_digits:
+    udiv r5, r0, r4             // r5 = r0 / 10 (quotient)
+    mls r8, r4, r5, r0         // r8 = r0 % 10 (remainder)
+    add r6, r6, r8             // Add digit to sum (r6 += remainder)
+    mov r0, r5                 // Update r0 with quotient for next iteration
+    cmp r0, #0                 // Check if quotient is 0
+    bne extract_digits          // Loop until all digits processed
+
+exit:
+    mov r7, #7                 // Divisor for mod operation
+    udiv r8, r6, r7            // r8 = sum / 7
+    mls r0, r8, r7, r6         // r0 = sum % 7
+    pop {r4, r5, r6, r7, r8, lr}
+    bx lr
 	
+exit9:
+	pop {r4, r5, r6, r7, r8, lr} //Restore registers
+    bx lr						 // Branch back to caller with r0
+    .fnend
+	
+	
+fibonacci:
+	.fnstart
+	   push {lr}
+	   // Base Case
+	   // If n<=1, return
+	   cmp r0, #1			//Compare r0 with 1
+	   ble end_fib			//If it is equal or less than one exit via end_fib
+	   
+	   //Recursive Case
+	   // fibonacci(n-1) + fibonacci(n-2)
+	   push {r0}			//Push r0 in the stack
+	   sub r0, r0, #1		
+	   bl fibonacci
+	   pop {r1}
+	   push {r0}
+	   sub r0, r1, #2
+	   bl fibonacci
+	   
+	   pop {r1}
+	   add r0, r0, r1
+   
+end_fib:
+		pop {pc}
 	.fnend
 
 	
