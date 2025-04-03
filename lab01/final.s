@@ -103,29 +103,30 @@ exit9:
 	
 	
 fibonacci:
-	.fnstart
-	   push {lr}
-	   // Base Case
-	   // If n<=1, return
-	   cmp r0, #1			//Compare r0 with 1
-	   ble end_fib			//If it is equal or less than one exit via end_fib
-	   
-	   //Recursive Case
-	   // fibonacci(n-1) + fibonacci(n-2)
-	   push {r0}			//Push r0 in the stack
-	   sub r0, r0, #1		
-	   bl fibonacci
-	   pop {r1}
-	   push {r0}
-	   sub r0, r1, #2
-	   bl fibonacci
-	   
-	   pop {r1}
-	   add r0, r0, r1
-   
+    .fnstart
+       push {lr}              // Save the return address to stack
+
+       // Base Case: If n <= 1, return n
+       cmp r0, #1             // Compare r0 (n) with 1
+       ble end_fib            // If n <= 1, jump to end_fib (return n)
+
+       // Recursive Case: Compute fibonacci(n-1) + fibonacci(n-2)
+       push {r0}              // Save current n on stack
+       sub r0, r0, #1         // Compute n-1
+       bl fibonacci           // Recursive call: fibonacci(n-1)
+       pop {r1}               // Restore original n from stack
+
+       push {r0}              // Save fibonacci(n-1) result
+       sub r0, r1, #2         // Compute n-2
+       bl fibonacci           // Recursive call: fibonacci(n-2)
+
+       pop {r1}               // Restore fibonacci(n-1) result
+       add r0, r0, r1         // r0 = fibonacci(n-1) + fibonacci(n-2)
+
 end_fib:
-		pop {pc}
-	.fnend
+       pop {pc}               // Restore return address and return
+    .fnend
+
 
 xor:
 	.fnstart
