@@ -18,6 +18,7 @@
 
 	typedef enum { STATE_IDLE, STATE_RUNNING, STATE_LOCKED, STATE_LOOPED } run_state_t;
 	volatile run_state_t state = STATE_IDLE;
+	volatile looped_state = false;
 	static int count = 0;								// Button press counter
 	
 
@@ -68,6 +69,8 @@
 			uart_print("Enter a number:");
 			buff_index=0;
 			
+			looped_state = false;
+			
 			NVIC_DisableIRQ(TIM2_IRQn);         // timer interrupt off
 			NVIC_DisableIRQ(EXTI15_10_IRQn);    // button interrupt off
 			
@@ -98,21 +101,18 @@
 			uart_print("\r\n"); // Print newline
 			
 			// Check if buffer overflow occurred
-			 if (buff_index >= UART_RX_BUFFER_SIZE) {
+			if (buff_index >= UART_RX_BUFFER_SIZE) {
 					uart_print("Stop trying to overflow my buffer! I resent that!\r\n");
 			}
 
-					
-					if (buff[buff_index - 2] == '-') {
-						state = STATE_LOOPED;	//loop
-					}
-					else {
-						state = STATE_RUNNING;	//once
-					}
-					timer_enable();           // kick off timer_isr() every 0.5s			
-		
-
-			
+			state = STATE_RUNNING;
+			if (buff[buff_index - 2] == '-') {
+				looped_state = true;	//loop
+			}
+			else {
+				looped_state = false;	//once
+			}
+			timer_enable();           // kick off timer_isr() every 0.5s			
 		}
 		
 	}
@@ -150,7 +150,7 @@ void button_isr(int sources){
 }
 
 void timer_isr(void) {
-	if ( (state == STATE_RUNNING) || (state == STATE_LOOPED) ) {
+	if (state != STATE_IDLE) {
 		static uint32_t timer_pos = 0;        // next character in buff[] to process
 		char buf[64];
 
@@ -159,14 +159,14 @@ void timer_isr(void) {
 		uint32_t buff_len = buff_index - 1;		//how about we do that in main
 
 		// 1) if we've run out of characters, stop if state==running, loop if state==looped
-		if (state == STATE_RUNNING && timer_pos >= buff_len) {
+		if (looped_state == false && timer_pos >= buff_len) {
 			timer_pos = 0;                     // reset for next run
 			timer_disable();
 			uart_print("End of sequence. Waiting for new number...\r\n");	//does this appear?
 			state = STATE_IDLE;
 			return;
 		}
-		else if (state == STATE_LOOPED && timer_pos >= buff_len) {
+		else if (looped_state == true && timer_pos >= buff_len) {
 			timer_pos = 0;                     // reset for next run
 		}
 
@@ -175,7 +175,8 @@ void timer_isr(void) {
 		// 3) convert ASCII to integer
 		int d = rx - '0'; 
 
-		// 4) do exactly the same LED logic you had before:
+		// 4) if button isn't pressed
+		if (state == STATE_RUNNING) {
 			if ((d & 1) == 0) {							//faster implementation of d%2==0
 				// even digit: blink 200ms on/off
 				gpio_set(P_LED_G, 1);
@@ -193,6 +194,26 @@ void timer_isr(void) {
 				sprintf(buf, "\nDigit %c (odd): LED toggled\r\n", rx);
 				uart_print(buf);
 			}
+		}
+		else if (state == STATE_LOCKED){
+			if ((d & 1) == 0) {							//faster implementation of d%2==0
+				// even digit: blink 200ms on/off
+				// gpio_set(P_LED_G, 1);
+				sprintf(buf, "\nDigit %c (even): LED ON\r\n", rx);
+				uart_print(buf);
+				delay_ms(200);
+				
+				// gpio_set(P_LED_G, 0);
+				sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
+				uart_print(buf);
+				delay_ms(200);
+			} else {
+				// odd digit: toggle and hold
+				// gpio_toggle(P_LED_G);
+				sprintf(buf, "\nDigit %c (odd): LED toggled\r\n", rx);
+				uart_print(buf);
+			}
+		}
     }
 
 //    // 5) log what actually happened
