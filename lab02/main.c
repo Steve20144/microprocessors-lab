@@ -103,8 +103,12 @@
 			}
 
 					
-			
-					state = STATE_RUNNING;    // prepare ISR to run normally
+					if (buff[buff_index - 2] == '-') {
+						state = STATE_LOOPED;	//loop
+					}
+					else {
+						state = STATE_RUNNING;	//once
+					}
 					timer_enable();           // kick off timer_isr() every 0.5s			
 		
 
