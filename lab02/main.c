@@ -33,7 +33,6 @@ Queue rx_queue;
 void button_isr(int sources);
 void uart_rx_isr(uint8_t rx);
 void timer_isr(void);
-void delay200_isr(void);
 
 int main(void) {
     uint8_t rx_char = 0;
@@ -56,7 +55,6 @@ int main(void) {
     timer_init(500);
     timer_disable();                         // start disabled
     timer_set_callback(timer_isr);
-	timer_set_callback(delay200_isr);
 
     
 
@@ -114,10 +112,7 @@ int main(void) {
 
         // Begin processing digits in timer ISR
         
-		if(state != STATE_LOCKED) {
-			state = STATE_RUNNING;
-		}
-		
+				if(state != STATE_LOCKED) state = STATE_RUNNING;
 		if (buff[buff_index - 2] == '-') {
 			looped_state = true;	//loop
 		}
@@ -125,7 +120,10 @@ int main(void) {
 			looped_state = false;	//once
 		}
 
-		timer_enable();
+				
+        timer_enable();
+				
+				
     }
 }
 
@@ -206,14 +204,12 @@ void timer_isr(void) {
 				gpio_set(P_LED_R, 1);
 				sprintf(buf, "\nDigit %c (even): LED ON\r\n", rx);
 				uart_print(buf);
-				// delay_ms(200);
-				delay200_isr();
+				delay_ms(200);
 
 				gpio_set(P_LED_R, 0);
 				sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
 				uart_print(buf);
-				// delay_ms(200);
-				delay200_isr();
+				delay_ms(200);
 			} else {
 				// odd digit: toggle and hold
 				gpio_toggle(P_LED_R);
@@ -227,14 +223,12 @@ void timer_isr(void) {
 				// gpio_set(P_LED_R, 1);
 				sprintf(buf, "\nDigit %c (even): LED ON\r\n", rx);
 				uart_print(buf);
-				// delay_ms(200);
-				delay200_isr();
+				delay_ms(200);
 
 				// gpio_set(P_LED_R, 0);
 				sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
 				uart_print(buf);
-				// delay_ms(200);
-				delay200_isr();
+				delay_ms(200);
 			} else {
 				// odd digit: toggle and hold
 				// gpio_toggle(P_LED_R);
@@ -245,19 +239,4 @@ void timer_isr(void) {
 	}
 }
 }
-
-void delay200_isr(void) {
-	switch (counter200) {
-		case 0:
-			while(counter200 !=2){
-			}
-			break;
-		case 1:
-			while(counter200 !=0){
-			}
-			break;
-		default:     //(counter200==2)
-			while(counter200 !=1){
-			}
-			break;
-}
+	
