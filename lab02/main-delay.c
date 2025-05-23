@@ -21,6 +21,7 @@ volatile run_state_t state = STATE_IDLE;
 
 volatile bool looped_state = false;
 volatile bool delay200_state = false;
+volatile bool blink_state = false;
 volatile uint64_t counter100 = 0;    //((( (max uint64 = 18 446 744 073 709 551 615) × 0,1ms)/60)/60)/24)/365 ˜ 58 494 241 736 years > 58 billion years
 volatile uint64_t timer_counter500 = 0;
 volatile uint64_t timer_counter200 = 0;
@@ -59,7 +60,7 @@ int main(void) {
     leds_init();
 
     // --- Initialize 0.1s timer (100,000 µs) ---
-    timer_init(160000);
+    timer_init(400000);												//clock_freq=160khz
     timer_disable();                         // start disabled
     timer_set_callback(timer_isr);
 
@@ -195,10 +196,6 @@ void timer_isr(void) {
 }
 
 
-//keeps time, invoked every 100ms
-void currentTime_isr(void) {
-    counter100++;
-}
 
 //delay200
 void delay200(void) {
@@ -218,7 +215,7 @@ void digitProcess(void) {
 
 		// buff_index was set in main as (characters read + 1 for '\r').
 		// After null-termination in main, the valid digits are in buff[0]…buff[buff_index-2].
-		uint32_t buff_len = buff_index - 1;		//how about we do that in main
+		//uint32_t buff_len = buff_index - 1;		//how about we do that in main
 
 		// 1) if we've run out of characters, stop if state==running, loop if state==looped
 		if (looped_state == false && buff[timer_pos] == '\0') {
