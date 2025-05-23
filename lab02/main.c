@@ -246,4 +246,25 @@ void timer_isr(void) {
 }
 }
 	
+...
+//global variable
+uint64 counter100;    //((( (max uint64 = 18 446 744 073 709 551 615) × 0,1ms)/60)/60)/24)/365 ≈ 58 494 241 736 years > 58 billion years
+...
 
+void timer_isr(void) {
+    uint64 timer_counter500 = counter100; //holds the time when function is called
+    while ( (counter100 - 5 - timer_counter) != 0 ) {
+        ...
+    }
+
+//keeps time, invoked every 100ms
+void currentTime_isr(void) {
+    counter100++;
+}
+
+//delay200
+void delay200(void) {
+    uint64 timer_counter200 = counter100; //holds the time when function is called
+    while ( (counter100 - 2 - timer_counter200) != 0 ) {    //empty while, just delays
+    }
+}
