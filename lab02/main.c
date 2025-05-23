@@ -58,7 +58,7 @@ int main(void) {
 
     
 
-    __enable_irq();
+    
 		
 		// --- Set interrupt priorities ---
 		
@@ -66,7 +66,9 @@ int main(void) {
 		
 		NVIC_SetPriority(TIM2_IRQn, 			2);		//Timer priority
     NVIC_SetPriority(USART2_IRQn,     1);    // UART priority
-    NVIC_SetPriority(EXTI15_10_IRQn,  0);    // Button highest
+    NVIC_SetPriority(EXTI15_10_IRQn,  3);    // Button highest
+		
+		__enable_irq();
 
     uart_print("\r\n");
 
@@ -143,8 +145,10 @@ void button_isr(int sources) {
     gpio_set(P_DBG_ISR, 1);
     if ((sources << GET_PIN_INDEX(P_SW)) & (1 << GET_PIN_INDEX(P_SW))) {
         count++;
-        if(gpio_get(P_SW)){
+        if(!(count%2)){
 					state = STATE_LOCKED;
+					
+					
 					char buf[64];
             sprintf(buf,
                     "Interrupt: Button pressed. LED Locked. Count = %d\r\n",
@@ -178,14 +182,16 @@ void timer_isr(void) {
 		uint32_t buff_len = buff_index - 1;		//how about we do that in main
 
 		// 1) if we've run out of characters, stop if state==running, loop if state==looped
-		if (looped_state == false && timer_pos >= buff_len) {
+		if (looped_state == false && buff[timer_pos] == '\0') {
 			timer_pos = 0;                     // reset for next run
 			timer_disable();
 			uart_print("End of sequence. Waiting for new number...\r\n");	//does this appear?
 			state = STATE_IDLE;
 			return;
 		}
-		else if (looped_state == true && timer_pos >= buff_len) {
+		else if (looped_state == true && buff[timer_pos] == '\0') {
+			
+			
 			timer_pos = 0;                     // reset for next run
 		}
 
@@ -240,3 +246,4 @@ void timer_isr(void) {
 }
 }
 	
+
