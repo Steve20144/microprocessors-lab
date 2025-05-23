@@ -59,7 +59,7 @@ int main(void) {
     leds_init();
 
     // --- Initialize 0.1s timer (100,000 µs) ---
-    timer_init(2000);
+    timer_init(160000);
     timer_disable();                         // start disabled
     timer_set_callback(timer_isr);
 
