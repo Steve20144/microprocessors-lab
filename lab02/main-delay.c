@@ -23,11 +23,11 @@ volatile bool looped_state = false;
 volatile bool delay200_state = false;
 volatile bool blink_state = false;
 volatile bool button_state = false;
-volatile bool even = false;
 volatile int32_t counter100 = 0;    //((( (max uint64 = 18 446 744 073 709 551 615) × 0,1ms)/60)/60)/24)/365 ˜ 58 494 241 736 years > 58 billion years
 // volatile uint64_t timer_counter500 = 0;
 // volatile uint64_t timer_counter200 = 0;
 volatile int32_t timer_pos = 0;        // next character in buff[] to process
+volatile int32_t ledstate = 0;
 volatile char rx = '0';
 volatile char buf[64];
 // Button press counter
@@ -43,7 +43,7 @@ void button_isr(int sources);
 void uart_rx_isr(uint8_t rx);
 void timer_isr(void);
 void digitProcess(void);
-void delay_isr(void);
+// void delay_isr(void);
 void blink(void);
 
 int main(void) {
