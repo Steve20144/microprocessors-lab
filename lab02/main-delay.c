@@ -43,7 +43,8 @@ void timer_isr(void);
 void currentTime_isr(void);
 void delay200(void);
 void digitProcess(void);
-void delay_isr(void)
+void delay_isr(void);
+void blink(void);
 
 int main(void) {
 	uint8_t rx_char = 0;
@@ -327,17 +328,18 @@ void digitProcess(void) {
 void blink(void) {
 	// even digit: blink 200ms on/off
 	char buf2[64];
-	if (ledstate == 0)
-		gpio_set(P_LED_R, 1);
-	sprintf(buf2, "\nDigit %c (even): LED ON\r\n", rx2);
-	uart_print(buf2);
+	if (ledstate == 0) {
+			gpio_set(P_LED_R, 1);
+		sprintf(buf2, "\nDigit %c (even): LED ON\r\n", rx2);
+		uart_print(buf2);
 
-	timer_counter200 = counter100;
-	delay200_state = true;
-	timer_disable();
-	timer_set_callback(delay_isr);
-	timer_enable();
-	ledstate = 1;
+		timer_counter200 = counter100;
+		delay200_state = true;
+		timer_disable();
+		timer_set_callback(delay_isr);
+		timer_enable();
+		ledstate = 1;
+	}
 	else if (ledstate == 1) {
 		gpio_set(P_LED_R, 0);
 		sprintf(buf2, "\nDigit %c (even): LED OFF\r\n", rx2);
