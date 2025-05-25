@@ -81,8 +81,8 @@ int main(void) {
 
     // --- Main loop: prompt, read line, then start blinking ---
     while (1) {
-			
-				
+
+
         uart_print("Enter a number:");
         buff_index = 0;
 
@@ -129,10 +129,8 @@ int main(void) {
 			looped_state = false;	//once
 		}
 
-				timer_counter500 = counter100; //holds the time when function is called
+		timer_counter500 = counter100; //holds the time when function is called
         timer_enable();
-				
-				
     }
 }
 
@@ -195,17 +193,28 @@ void timer_isr(void) {
 	counter100++;
 }
 
-
-
 //delay200
 void delay200(void) {
 	printf("\ncounter100: %lld\tcounter200: %lld",counter100,timer_counter200);
 	if ( (counter100 - 2 - timer_counter200) == 0 ) {
+		if (blink_state == false) {
 		printf("\ncounter100': %lld\tcounter200': %lld",counter100,timer_counter200);
-    //timer_counter200 = counter100; //holds the time when function is called
+		//timer_counter200 = counter100; //holds the time when function is called
 		delay200_state = false;
 		timer_counter200 = 0;
 		timer_counter500 = counter100;
+		}
+		else if (blink_state == true) {
+			blink_state = false;
+			//turns off led and goes back to delay mode
+			gpio_set(P_LED_R, 0);
+			sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
+			uart_print(buf);
+			timer_counter200 = counter100;
+			delay200_state = true;
+			delay200();
+			//delay_ms(200);
+		}
 	}
 }
 
@@ -217,7 +226,7 @@ void digitProcess(void) {
 		// After null-termination in main, the valid digits are in buff[0]…buff[buff_index-2].
 		//uint32_t buff_len = buff_index - 1;		//how about we do that in main
 
-		// 1) if we've run out of characters, stop if state==running, loop if state==looped
+		// 1) if we've run out of characters, stop if state==running,d loop if state==looped
 		if (looped_state == false && buff[timer_pos] == '\0') {
 			timer_pos = 0;                     // reset for next run
 			timer_disable();
@@ -251,13 +260,13 @@ void digitProcess(void) {
 				delay200();
 				//delay_ms(200);
 
-				gpio_set(P_LED_R, 0);
-				sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
-				uart_print(buf);
-				timer_counter200 = counter100;
-				delay200_state = true;
-				delay200();
-				//delay_ms(200);
+				// gpio_set(P_LED_R, 0);
+				// sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
+				// uart_print(buf);
+				// timer_counter200 = counter100;
+				// delay200_state = true;
+				// delay200();
+				// //delay_ms(200);
 			} else {
 				// odd digit: toggle and hold
 				gpio_toggle(P_LED_R);
