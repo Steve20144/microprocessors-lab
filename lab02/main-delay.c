@@ -188,12 +188,12 @@ void timer_isr(void) {
 	//activates every 5 beats
 	// if ( (counter100 - 5 - timer_counter500) == 0 ) {
 	// 	timer_counter500 = counter100; //holds the time when function is called
-		printf("\ncounter100': %lld\tcounter500': %lld",counter100,timer_counter500);
+		printf("\r\ncounter100': %d\rn",counter100);
 		if (state != STATE_IDLE) {
 			digitProcess();
 		}
-	}
-	if (counter100++ - 5 == 0) {
+
+	if ((counter100++) - 5 == 0) {
 		counter100 = 0;
 	}
 }
@@ -245,16 +245,18 @@ void digitProcess(void) {
 			// 3) sanitize input and convert ASCII to integer
 			if (rx >= '0' && rx <= '9'){
 				int d = rx - '0';
+			
 
 			// 4) blinking and output
-			if ((d & 1) == 0) {							//faster implementation of d%2==0
-				// even digit: blink 200ms on/off
-				ledstate = 0;
-				blink();
-			} else {
-				// odd digit: toggle and hold
-				ledstate = 2;
-				blink();
+				if ((d & 1) == 0) {							//faster implementation of d%2==0
+					// even digit: blink 200ms on/off
+					ledstate = 0;
+					blink();
+				} else {
+					// odd digit: toggle and hold
+					ledstate = 2;
+					blink();
+				}
 			}
 			break;
 		case 2:
@@ -300,7 +302,7 @@ void blink(void) {
 			break;
 		case 2:
 			// odd digit: toggle and hold
-			ledstate = 0;
+			//ledstate = 0;
 			if (button_state == false) {
 				gpio_toggle(P_LED_R);
 			}
@@ -330,4 +332,3 @@ void blink(void) {
 			break;
 	}
 }
-
