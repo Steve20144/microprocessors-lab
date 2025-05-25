@@ -22,6 +22,7 @@ volatile run_state_t state = STATE_IDLE;
 volatile bool looped_state = false;
 volatile bool delay200_state = false;
 volatile bool blink_state = false;
+volatile bool button_state = false;
 volatile uint64_t counter100 = 0;    //((( (max uint64 = 18 446 744 073 709 551 615) × 0,1ms)/60)/60)/24)/365 ˜ 58 494 241 736 years > 58 billion years
 volatile uint64_t timer_counter500 = 0;
 volatile uint64_t timer_counter200 = 0;
@@ -153,9 +154,10 @@ void uart_rx_isr(uint8_t rx) {
 void button_isr(int sources) {
 	gpio_set(P_DBG_ISR, 1);
 	if ((sources << GET_PIN_INDEX(P_SW)) & (1 << GET_PIN_INDEX(P_SW))) {
-		count++;
+		//
 		if(!(count%2)){
-			state = STATE_LOCKED;
+			//state = STATE_LOCKED;
+			button_state = true;
 
 
 			char buf[64];
@@ -166,13 +168,15 @@ void button_isr(int sources) {
 
 		}
 		else {
-			state = STATE_RUNNING;
+			//state = STATE_RUNNING;
+			button_state = false;
 			char buf[64];
 			sprintf(buf,
-					"Interrupt: Button pressed. LED Locked. Count = %d\r\n",
+					"Interrupt: Button pressed. LED Unlocked. Count = %d\r\n",
 		   count);
 			uart_print(buf);
 		}
+		count++;
 	}
 	gpio_set(P_DBG_ISR, 0);
 }
@@ -291,10 +295,13 @@ void digitProcess(void) {
 				// delay200();
 				// //delay_ms(200);
 			} else {
+				ledstate = 4;
+				rx2=rx;
+				blink();
 				// odd digit: toggle and hold
-				gpio_toggle(P_LED_R);
-				sprintf(buf, "\nDigit %c (odd): LED toggled\r\n", rx);
-				uart_print(buf);
+//				gpio_toggle(P_LED_R);
+//				sprintf(buf, "\nDigit %c (odd): LED toggled\r\n", rx);
+//				uart_print(buf);
 			}
 		}
 		if (state == STATE_LOCKED){
@@ -326,10 +333,13 @@ void digitProcess(void) {
 }
 
 void blink(void) {
-	// even digit: blink 200ms on/off
 	char buf2[64];
+	// even digit: blink 200ms on/off
+	// even digit: turn on
 	if (ledstate == 0) {
+		if (button_state == false) {
 			gpio_set(P_LED_R, 1);
+		}
 		sprintf(buf2, "\nDigit %c (even): LED ON\r\n", rx2);
 		uart_print(buf2);
 
@@ -340,15 +350,19 @@ void blink(void) {
 		timer_enable();
 		ledstate = 1;
 	}
+	// even digit: turn off
 	else if (ledstate == 1) {
+		if (button_state == false) {
 		gpio_set(P_LED_R, 0);
+		}
 		sprintf(buf2, "\nDigit %c (even): LED OFF\r\n", rx2);
 		uart_print(buf2);
 		timer_counter200 = counter100;
 		delay200_state = true;
 		ledstate = 2;
 	}
-	else {
+	// even digit: disable delay
+	else if (ledstate == 2) {
 		ledstate = 0;
 		timer_counter200 = counter100;
 		delay200_state = false;
@@ -356,5 +370,14 @@ void blink(void) {
 		timer_disable();
 		timer_set_callback(timer_isr);
 		timer_enable();
+	}
+	// odd digit: toggle and hold
+	else if (ledstate == 4) {
+		ledstate = 0;
+		if (button_state == false) {
+		gpio_toggle(P_LED_R);
+		}
+		sprintf(buf2, "\nDigit %c (odd): LED toggled\r\n", rx2);
+		uart_print(buf2);
 	}
 }
