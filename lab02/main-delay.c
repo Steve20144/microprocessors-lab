@@ -23,10 +23,8 @@ volatile bool looped_state = false;
 volatile bool delay200_state = false;
 volatile bool blink_state = false;
 volatile bool button_state = false;
-volatile int32_t counter100 = 0;    //((( (max uint64 = 18 446 744 073 709 551 615) × 0,1ms)/60)/60)/24)/365 ˜ 58 494 241 736 years > 58 billion years
-// volatile uint64_t timer_counter500 = 0;
-// volatile uint64_t timer_counter200 = 0;
-volatile int32_t timer_pos = 0;        // next character in buff[] to process
+volatile int32_t counter100 = 0;    //
+volatile int32_t timer_pos = 0;     // next character in buff[] to process
 volatile int32_t ledstate = 0;
 volatile char rx = '0';
 volatile char buf[64];
@@ -43,7 +41,6 @@ void button_isr(int sources);
 void uart_rx_isr(uint8_t rx);
 void timer_isr(void);
 void digitProcess(void);
-// void delay_isr(void);
 void blink(void);
 
 int main(void) {
@@ -134,7 +131,6 @@ int main(void) {
 			looped_state = false;	//once
 		}
 
-		// timer_counter500 = counter100; //holds the time when function is called
 		timer_enable();
 	}
 }
@@ -156,10 +152,7 @@ void button_isr(int sources) {
 	if ((sources << GET_PIN_INDEX(P_SW)) & (1 << GET_PIN_INDEX(P_SW))) {
 		//
 		if(!(count%2)){
-			//state = STATE_LOCKED;
 			button_state = true;
-
-
 			sprintf(buf,
 					"Interrupt: Button pressed. LED Locked. Count = %d\r\n",
 		   count);
@@ -167,7 +160,6 @@ void button_isr(int sources) {
 
 		}
 		else {
-			//state = STATE_RUNNING;
 			button_state = false;
 			sprintf(buf,
 					"Interrupt: Button pressed. LED Unlocked. Count = %d\r\n",
@@ -184,44 +176,18 @@ void button_isr(int sources) {
 
 // Timer ISR: handle one digit per tick
 void timer_isr(void) {
-	// printf("\ncounter100: %lld\tcounter500: %lld",counter100,timer_counter500);
-	//activates every 5 beats
-	// if ( (counter100 - 5 - timer_counter500) == 0 ) {
-	// 	timer_counter500 = counter100; //holds the time when function is called
-		printf("\r\ncounter100': %d\rn",counter100);
-		if (state != STATE_IDLE) {
-			digitProcess();
-		}
+	printf("\r\ncounter100': %d\rn",counter100);
+	if (state != STATE_IDLE) {
+		digitProcess();
+	}
 
 	if ((counter100++) - 5 == 0) {
 		counter100 = 0;
 	}
 }
 
-// //delay200 and blink
-// void delay_isr(void) {
-// 	printf("\ncounter100: %lld\tcounter200: %lld",counter100,timer_counter200);
-// 	if ( (counter100 - 2 - timer_counter200) == 0 ) {
-// 		printf("\ncounter100': %lld\tcounter200': %lld",counter100,timer_counter200);
-// 		delay200_state = false;
-// 		timer_counter200 = 0;
-// 		timer_counter500 = 1 + counter100;
-//
-// 		blink();
-// 	}
-// 	counter100++;
-// }
 
 void digitProcess(void) {
-	// static int32_t timer_pos = 0;
-	// char buf[64];
-
-	// buff_index was set in main as (characters read + 1 for '\r').
-	// After null-termination in main, the valid digits are in buff[0]…buff[buff_index-2].
-	//uint32_t buff_len = buff_index - 1;		//how about we do that in main
-
-
-
 	switch (counter100) {
 		case 0:
 			// 1) if we've run out of characters, stop if state==running, loop if state==looped
@@ -231,8 +197,6 @@ void digitProcess(void) {
 				uart_print("End of sequence. Waiting for new number...\r\nEnter a number: ");	//does this appear?
 				state = STATE_IDLE;
 				counter100=0;
-				// timer_counter200=0;
-				// timer_counter500=0;
 				return;
 			}
 			else if (looped_state == true && buff[timer_pos] == '\0') {
@@ -280,13 +244,6 @@ void blink(void) {
 			}
 			sprintf(buf, "\nDigit %c (even): LED ON\r\n", rx);
 			uart_print(buf);
-
-			// timer_counter200 = 1 + counter100;
-			// delay200_state = true;
-			// timer_disable();
-			// timer_set_callback(delay_isr);
-			// timer_enable();
-			// ledstate = 1;	//for next time it is called
 			break;
 		case 1:
 			// even digit: turn off
@@ -295,37 +252,15 @@ void blink(void) {
 			}
 			sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
 			uart_print(buf);
-
-			// timer_counter200 = 1 + counter100;
-			// delay200_state = true;
-			// ledstate = 2;
 			break;
 		case 2:
 			// odd digit: toggle and hold
-			//ledstate = 0;
 			if (button_state == false) {
 				gpio_toggle(P_LED_R);
 			}
 			sprintf(buf, "\nDigit %c (odd): LED toggled\r\n", rx);
 			uart_print(buf);
-			// even digit: disable delay
-			// ledstate = 0;
-			// timer_counter200 = 1 + counter100;
-			// delay200_state = false;
-			// timer_counter500 = 1 + counter100;
-			// timer_disable();
-			// timer_set_callback(timer_isr);
-			// timer_enable();
 			break;
-		// case 3:
-			// // odd digit: toggle and hold
-			// ledstate = 0;
-			// if (button_state == false) {
-			// 	gpio_toggle(P_LED_R);
-			// }
-			// sprintf(buf, "\nDigit %c (odd): LED toggled\r\n", rx2);
-			// uart_print(buf);
-			// break;
 		default:
 			uart_print("\r\nSWITCH CASE FAILED\r\n");
 			printf("\r\nSWITCH CASE FAILED\r\n");
