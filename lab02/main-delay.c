@@ -41,8 +41,6 @@ Queue rx_queue;
 void button_isr(int sources);
 void uart_rx_isr(uint8_t rx);
 void timer_isr(void);
-void currentTime_isr(void);
-void delay200(void);
 void digitProcess(void);
 void delay_isr(void);
 void blink(void);
@@ -137,7 +135,6 @@ int main(void) {
 
 		timer_counter500 = counter100; //holds the time when function is called
 		timer_enable();
-		//uart_print("\r\nEnter a number: ");
 	}
 }
 
@@ -190,49 +187,28 @@ void button_isr(int sources) {
 void timer_isr(void) {
 	printf("\ncounter100: %lld\tcounter500: %lld",counter100,timer_counter500);
 	//activates every 5 beats
-	if ( delay200_state == false && (counter100 - 5 - timer_counter500) == 0 ) {
+	if ( (counter100 - 5 - timer_counter500) == 0 ) {
 		timer_counter500 = counter100; //holds the time when function is called
 		printf("\ncounter100': %lld\tcounter500': %lld",counter100,timer_counter500);
 		if (state != STATE_IDLE) {
 			digitProcess();
 		}
 	}
-	else if ( delay200_state == true ) {
-		delay200();
-	}
 	counter100++;
 }
 
+//delay200 and blink
 void delay_isr(void) {
-	delay200();
-	counter100++;
-}
-
-//delay200
-void delay200(void) {
 	printf("\ncounter100: %lld\tcounter200: %lld",counter100,timer_counter200);
 	if ( (counter100 - 2 - timer_counter200) == 0 ) {
-		// if (blink_state == false) {
 		printf("\ncounter100': %lld\tcounter200': %lld",counter100,timer_counter200);
-		//timer_counter200 = counter100; //holds the time when function is called
 		delay200_state = false;
 		timer_counter200 = 0;
 		timer_counter500 = 1 + counter100;
 
 		blink();
-		// }
-		// else if (blink_state == true) {
-		// 	blink_state = false;
-		// 	//turns off led and goes back to delay mode
-		// 	gpio_set(P_LED_R, 0);
-		// 	sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
-		// 	uart_print(buf);
-		// 	timer_counter200 = counter100;
-		// 	delay200_state = true;
-		// 	delay200();
-		// 	//delay_ms(200);
-		// }
 	}
+	counter100++;
 }
 
 void digitProcess(void) {
@@ -249,87 +225,33 @@ void digitProcess(void) {
 		timer_disable();
 		uart_print("End of sequence. Waiting for new number...\r\nEnter a number: ");	//does this appear?
 		state = STATE_IDLE;
+		counter100=0;
+		timer_counter200=0;
+		timer_counter500=0;
 		return;
 	}
 	else if (looped_state == true && buff[timer_pos] == '\0') {
-
-
 		timer_pos = 0;                     // reset for next run
 	}
 
 	// 2) pull next digit directly from buff[]
 	char rx = buff[timer_pos++];
-	// 3) convert ASCII to integer
+	
+	// 3) sanitize input and convert ASCII to integer
 	if (rx >= '0' && rx <= '9'){
-		//
-
 		int d = rx - '0';
-
-		// 4) if button isn't pressed
-		if (state == STATE_RUNNING) {
-			if ((d & 1) == 0) {							//faster implementation of d%2==0
-				// even digit: blink 200ms on/off
-				ledstate = 0;
-				rx2=rx;
-				blink();
-				// gpio_set(P_LED_R, 1);
-				// sprintf(buf, "\nDigit %c (even): LED ON\r\n", rx);
-				// uart_print(buf);
-				// timer_counter200 = counter100;
-				// delay200_state = true;
-				// timer_disable();
-				// timer_set_callback(delay_isr);
-				// timer_enable();
-				// while (delay200_state==true) {
-				// 	__WFI();
-				// }
-				// timer_disable();
-				// timer_set_callback(timer_isr);
-				// timer_enable();
-				// //delay200();
-				// //delay_ms(200);
-    //
-				// gpio_set(P_LED_R, 0);
-				// sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
-				// uart_print(buf);
-				// timer_counter200 = counter100;
-				// delay200_state = true;
-				// delay200();
-				// //delay_ms(200);
-			} else {
-				ledstate = 3;
-				rx2=rx;
-				blink();
-				// odd digit: toggle and hold
-//				gpio_toggle(P_LED_R);
-//				sprintf(buf, "\nDigit %c (odd): LED toggled\r\n", rx);
-//				uart_print(buf);
-			}
-		}
-		if (state == STATE_LOCKED){
-			if ((d & 1) == 0) {							//faster implementation of d%2==0
-				// even digit: blink 200ms on/off
-				// gpio_set(P_LED_R, 1);
-				sprintf(buf, "\nDigit %c (even): LED ON\r\n", rx);
-				uart_print(buf);
-				timer_counter200 = counter100;
-				delay200_state = true;
-				delay200();
-				//delay_ms(200);
-
-				// gpio_set(P_LED_R, 0);
-				sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
-				uart_print(buf);
-				timer_counter200 = counter100;
-				delay200_state = true;
-				delay200();
-				//delay_ms(200);
-			} else {
-				// odd digit: toggle and hold
-				// gpio_toggle(P_LED_R);
-				sprintf(buf, "\nDigit %c (odd): LED toggled\r\n", rx);
-				uart_print(buf);
-			}
+		
+	// 4) blinking and output
+		if ((d & 1) == 0) {							//faster implementation of d%2==0
+			// even digit: blink 200ms on/off
+			ledstate = 0;
+			rx2=rx;
+			blink();
+		} else {
+			// odd digit: toggle and hold
+			ledstate = 3;
+			rx2=rx;
+			blink();
 		}
 	}
 }
@@ -346,7 +268,7 @@ void blink(void) {
 		sprintf(buf2, "\nDigit %c (even): LED ON\r\n", rx2);
 		uart_print(buf2);
 
-		timer_counter200 = counter100;
+		timer_counter200 = 1 + counter100;
 		delay200_state = true;
 		timer_disable();
 		timer_set_callback(delay_isr);
@@ -361,14 +283,14 @@ void blink(void) {
 		sprintf(buf2, "\nDigit %c (even): LED OFF\r\n", rx2);
 		uart_print(buf2);
 		
-		timer_counter200 = counter100;
+		timer_counter200 = 1 + counter100;
 		delay200_state = true;
 		ledstate = 2;
 		break;
 	case 2:
 		// even digit: disable delay
 		ledstate = 0;
-		timer_counter200 = counter100;
+		timer_counter200 = 1 + counter100;
 		delay200_state = false;
 		timer_counter500 = 1 + counter100;
 		timer_disable();
