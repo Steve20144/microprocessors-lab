@@ -59,8 +59,8 @@ int main(void) {
 
 	// --- Initialize 0.1s timer (100,000 µs) ---
 	//(CLK_FREQ/10)=1s
-	timer_init(CLK_FREQ/100);												//clock_freq=160khz??
-	timer_disable();                         // start disabled
+	timer_init(CLK_FREQ/100);		//clock_freq=160khz??
+	timer_disable();				// start disabled
 	timer_set_callback(timer_isr);
 
 
@@ -70,9 +70,9 @@ int main(void) {
 
 	NVIC_SetPriorityGrouping(2);
 
-	NVIC_SetPriority(TIM2_IRQn, 			2);		//Timer priority
-	NVIC_SetPriority(USART2_IRQn,     1);    // UART priority
-	NVIC_SetPriority(EXTI15_10_IRQn,  3);    // Button highest
+	NVIC_SetPriority(TIM2_IRQn,			2);	// Timer priority
+	NVIC_SetPriority(USART2_IRQn,		1);	// UART priority
+	NVIC_SetPriority(EXTI15_10_IRQn,	3);	// Button highest
 
 	__enable_irq();
 
@@ -154,7 +154,6 @@ void button_isr(int sources) {
 					"Interrupt: Button pressed. LED Locked. Count = %d\r\n",
 		   counter_button);
 			uart_print(buf);
-
 		}
 		else {				//if pressed at even times, then unlock
 			button_state = false;
@@ -192,7 +191,7 @@ void digitProcess(void) {
 			if (looped_state == false && buff[timer_pos] == '\0') {
 				timer_pos = 0;                     // reset for next run
 				timer_disable();
-				uart_print("End of sequence. Waiting for new number...\r\nEnter a number: ");	//does this appear?
+				uart_print("End of sequence. Waiting for new number...\r\nEnter a number: ");
 				state = STATE_IDLE;
 				counter100=0;
 				return;
