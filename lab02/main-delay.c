@@ -24,7 +24,7 @@ volatile bool button_state = false;	// for if the button is pressed
 volatile int32_t counter100 = 0;    // beat counter (0 to 5)
 volatile int32_t timer_pos = 0;     // next character position in buff[] to process
 volatile int32_t ledstate = 0;		// for blink funtion action
-volatile int counter_button = 0;				// Button press counter
+volatile int counter_button = 0;	// Button press counter
 volatile char rx = '0';				// the currently processed character
 volatile char buf[64];				// buffer to print with uart_print
 
