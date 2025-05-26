@@ -176,12 +176,12 @@ void button_isr(int sources) {
 
 // Timer ISR: handle one digit per tick
 void timer_isr(void) {
-	printf("\r\ncounter100': %d\rn",counter100);
-	if (state != STATE_IDLE) {
+	printf("Counter100: %d\rn", counter100);
+	if (state != STATE_IDLE)  {
 		digitProcess();
 	}
 
-	if ((counter100++) - 5 == 0) {
+	if ((counter100++) > 5) {
 		counter100 = 0;
 	}
 }
