@@ -19,17 +19,14 @@
 typedef enum { STATE_IDLE, STATE_RUNNING} run_state_t;
 volatile run_state_t state = STATE_IDLE;
 
-volatile bool looped_state = false;
-volatile bool delay200_state = false;
-volatile bool blink_state = false;
-volatile bool button_state = false;
-volatile int32_t counter100 = 0;    //
-volatile int32_t timer_pos = 0;     // next character in buff[] to process
-volatile int32_t ledstate = 0;
-volatile char rx = '0';
-volatile char buf[64];
-// Button press counter
-volatile int count = 0;
+volatile bool looped_state = false;	// for if the processing will loop
+volatile bool button_state = false;	// for if the button is pressed
+volatile int32_t counter100 = 0;    // beat counter (0 to 5)
+volatile int32_t timer_pos = 0;     // next character position in buff[] to process
+volatile int32_t ledstate = 0;		// for blink funtion action
+volatile int counter_button = 0;				// Button press counter
+volatile char rx = '0';				// the currently processed character
+volatile char buf[64];				// buffer to print with uart_print
 
 // UART RX buffer and queue
 volatile char buff[UART_RX_BUFFER_SIZE];
@@ -37,11 +34,11 @@ uint32_t buff_index;
 Queue rx_queue;
 
 // Function prototypes
-void button_isr(int sources);
-void uart_rx_isr(uint8_t rx);
-void timer_isr(void);
-void digitProcess(void);
-void blink(void);
+void button_isr(int sources);	// for the button interrupt
+void uart_rx_isr(uint8_t rx);	// for the uart
+void timer_isr(void);			// for the timer interrupt
+void digitProcess(void);		// for the digits processing
+void blink(void);				// for the led blinking
 
 int main(void) {
 	uint8_t rx_char = 0;
@@ -122,8 +119,8 @@ int main(void) {
 		}
 
 		// Begin processing digits in timer ISR
-
-		state = STATE_RUNNING;
+		state = STATE_RUNNING;	// sets state from idle to running
+		//check if the processing will be looped
 		if (buff[buff_index - 2] == '-') {
 			looped_state = true;	//loop
 		}
@@ -131,7 +128,7 @@ int main(void) {
 			looped_state = false;	//once
 		}
 
-		timer_enable();
+		timer_enable();	//start timer isr
 	}
 }
 
@@ -151,45 +148,46 @@ void button_isr(int sources) {
 	gpio_set(P_DBG_ISR, 1);
 	if ((sources << GET_PIN_INDEX(P_SW)) & (1 << GET_PIN_INDEX(P_SW))) {
 		//
-		if(!(count%2)){
+		if(!(counter_button%2)){		//if pressed at odd times, then lock
 			button_state = true;
 			sprintf(buf,
 					"Interrupt: Button pressed. LED Locked. Count = %d\r\n",
-		   count);
+		   counter_button);
 			uart_print(buf);
 
 		}
-		else {
+		else {				//if pressed at even times, then unlock
 			button_state = false;
 			sprintf(buf,
 					"Interrupt: Button pressed. LED Unlocked. Count = %d\r\n",
-		   count);
+		   counter_button);
 			uart_print(buf);
 		}
-		count++;
+		counter_button++;	//increment button counter
 	}
 	gpio_set(P_DBG_ISR, 0);
 }
 
 
 
-
-// Timer ISR: handle one digit per tick
+// Timer ISR: handle one digit per 5 ticks
 void timer_isr(void) {
-	printf("Counter100: %d\rn", counter100);
+	printf("Counter100: %d\rn", counter100);	//debug
 	if (state != STATE_IDLE) {
-		digitProcess();
+		digitProcess();	//process digits if not idle
 	}
 
-	if ((counter100++) > 5) {
-		counter100 = 0;
+	if ((counter100++) > 3) {
+		counter100 = 0;	//reset the timer counter after 5 beats (0, 1, 2, 3, 4)
 	}
 }
 
 
+// Processing digits
 void digitProcess(void) {
 	switch (counter100) {
 		case 0:
+			// 1st beat (0ms)
 			// 1) if we've run out of characters, stop if state==running, loop if state==looped
 			if (looped_state == false && buff[timer_pos] == '\0') {
 				timer_pos = 0;                     // reset for next run
@@ -209,8 +207,6 @@ void digitProcess(void) {
 			// 3) sanitize input and convert ASCII to integer
 			if (rx >= '0' && rx <= '9'){
 				int d = rx - '0';
-			
-
 			// 4) blinking and output
 				if ((d & 1) == 0) {							//faster implementation of d%2==0
 					// even digit: blink 200ms on/off
@@ -224,12 +220,14 @@ void digitProcess(void) {
 			}
 			break;
 		case 2:
-			if (ledstate == 0) {
-				ledstate = 1;
+			// 3rd beat (200ms = 0ms + 100ms + 100ms)
+			if (ledstate == 0) {	//activates only if the current digit is even
+				ledstate = 1;		//this will turn off the led
 				blink();
 			}
 			break;
 		default:
+			//skip the rest of the beats (100ms, 300ms, 400ms and 500ms)
 			break;
 	}
 }
@@ -237,9 +235,9 @@ void digitProcess(void) {
 void blink(void) {
 	switch (ledstate) {
 		case 0:
-			// even digit: blink 200ms on/off
+			// even digit: start blink 200ms on/off
 			// even digit: turn on
-			if (button_state == false) {
+			if (button_state == false) {	//do unless button is pressed/leds are locked
 				gpio_set(P_LED_R, 1);
 			}
 			sprintf(buf, "\nDigit %c (even): LED ON\r\n", rx);
@@ -247,7 +245,7 @@ void blink(void) {
 			break;
 		case 1:
 			// even digit: turn off
-			if (button_state == false) {
+			if (button_state == false) {	//do unless button is pressed/leds are locked
 				gpio_set(P_LED_R, 0);
 			}
 			sprintf(buf, "\nDigit %c (even): LED OFF\r\n", rx);
@@ -255,13 +253,14 @@ void blink(void) {
 			break;
 		case 2:
 			// odd digit: toggle and hold
-			if (button_state == false) {
+			if (button_state == false) {	//do unless button is pressed/leds are locked
 				gpio_toggle(P_LED_R);
 			}
 			sprintf(buf, "\nDigit %c (odd): LED toggled\r\n", rx);
 			uart_print(buf);
 			break;
 		default:
+			// exeption, this shouldn't happen
 			uart_print("\r\nSWITCH CASE FAILED\r\n");
 			printf("\r\nSWITCH CASE FAILED\r\n");
 			break;
