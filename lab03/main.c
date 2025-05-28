@@ -12,9 +12,9 @@ int main(void){
 	
 	uart_init(115200);
 	uart_enable();
-	gpio_set_mode(PB_10, Output);
-	gpio_set(PB_10, 1);
-	sprintf(buff,"gpio: %d\r\n", gpio_get(PB_10));
+	gpio_set_mode(PA_0, Output);
+	gpio_set(PA_0, 1);
+	sprintf(buff,"gpio: %d\r\n", gpio_get(PA_0));
 	uart_print(buff);
 	
 	__enable_irq();
