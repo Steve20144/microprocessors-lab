@@ -133,9 +133,10 @@ int main(void){
 			continue;
 		}
 	// UART input #END
-	
-	}
+
 	timer_enable();	//start timer isr
+	}
+	//timer_enable();	//start timer isr
 }
 
 // Button press ISR: toggle lock state on each press
