@@ -3,17 +3,18 @@
  * \brief     Driver for the DHT11 temperature and humidity sensor, no TIM2.
  */
 
-#include "gpio.h"     // for gpio_set_mode, gpio_set, gpio_get             :contentReference[oaicite:0]{index=0}
+#include "gpio.h"
 #include "platform.h"
 #include "uart.h"
 #include "dht11.h"
 #include "delay.h"
 
-#define DHT11_PIN            PA_0
-#define START_SIGNAL_MS      20       //!< pull low =18 ms
-#define RELEASE_HIGH_US      40       //!< host pulls high, then waits 20–40 µs
-#define RESPONSE_TIMEOUT_US  200      //!< wait up to 200 µs for each transition
-#define BIT_SAMPLE_US        40       //!< sample in middle of bit (˜40 µs)
+#define DHT11_PIN            PA_8
+#define START_SIGNAL_MS      20       // Minimum 18ms
+#define RELEASE_HIGH_US      40       // 20-40µs
+#define RESPONSE_TIMEOUT_US  200      // Max wait for transitions
+#define BIT_SAMPLE_US        40       // Sample in middle of bit
+#define MAX_RETRIES         3        // Number of read attempts
 
 // wait until pin == level, or timeout in µs expires
 static int wait_pin_state(Pin pin, int level, uint32_t timeout_us) {
@@ -25,56 +26,67 @@ static int wait_pin_state(Pin pin, int level, uint32_t timeout_us) {
 }
 
 int dht11_poll(uint8_t* data_out) {
-    // 1) Send start pulse
-    gpio_set_mode(DHT11_PIN, Output);
-    gpio_set(DHT11_PIN, 0);
-    delay_ms(START_SIGNAL_MS);
+    int retry = 0;
+    
+    while (retry++ < MAX_RETRIES) {
+        // 1) Send start pulse
+        gpio_set_mode(DHT11_PIN, Output);
+        gpio_set(DHT11_PIN, 0);
+        delay_ms(START_SIGNAL_MS);
 
-    // 2) Release bus: drive high, wait, then switch to input+pull-up
-    gpio_set(DHT11_PIN, 1);
-    delay_us(RELEASE_HIGH_US);
-    gpio_set_mode(DHT11_PIN, Input);
+        // 2) Release bus and switch to input
+        gpio_set(DHT11_PIN, 1);
+        delay_us(RELEASE_HIGH_US);
+        gpio_set_mode(DHT11_PIN, PullUp);
 
-    // 3) Sensor response: LOW ~80µs, then HIGH ~80µs, then LOW ? data
-    if (wait_pin_state(DHT11_PIN, 0, RESPONSE_TIMEOUT_US) < 0) {
-        uart_print("ERR: no initial LOW\r\n");
-        return -1;
-    }
-    if (wait_pin_state(DHT11_PIN, 1, RESPONSE_TIMEOUT_US) < 0) {
-        uart_print("ERR: no initial HIGH\r\n");
-        return -1;
-    }
-    if (wait_pin_state(DHT11_PIN, 0, RESPONSE_TIMEOUT_US) < 0) {
-        uart_print("ERR: start bit not ending\r\n");
-        return -1;
-    }
-
-    // 4) Read 40 bits
-    for (int i = 0; i < 5; i++) data_out[i] = 0;
-    for (int i = 0; i < 40; i++) {
-        // wait for line to go HIGH (start of bit)
-        if (wait_pin_state(DHT11_PIN, 1, RESPONSE_TIMEOUT_US) < 0) {
-            uart_print("ERR: bit start timeout\r\n");
-            return -1;
-        }
-        // sample in middle of the pulse
-        delay_us(BIT_SAMPLE_US);
-        int bit = gpio_get(DHT11_PIN);
-        data_out[i/8] = (data_out[i/8] << 1) | (bit ? 1 : 0);
-        // wait for line to go LOW (end of bit)
+        // 3) Wait for sensor response
         if (wait_pin_state(DHT11_PIN, 0, RESPONSE_TIMEOUT_US) < 0) {
-            uart_print("ERR: bit end timeout\r\n");
-            return -1;
+            uart_print("DHT11: No response (low)\r\n");
+					continue;
+            
         }
+        if (wait_pin_state(DHT11_PIN, 1, RESPONSE_TIMEOUT_US) < 0) {
+            uart_print("DHT11: No response (high)\r\n");
+					continue;
+            
+        }
+        if (wait_pin_state(DHT11_PIN, 0, RESPONSE_TIMEOUT_US) < 0) {
+            uart_print("DHT11: Start bit not ending\r\n");
+					continue;
+            
+        }
+
+        // 4) Read 40 bits (5 bytes)
+        for (int i = 0; i < 5; i++) data_out[i] = 0;
+        
+        for (int i = 0; i < 40; i++) {
+            // Wait for start of bit
+            if (wait_pin_state(DHT11_PIN, 1, RESPONSE_TIMEOUT_US) < 0) {
+                uart_print("DHT11: Bit start timeout\r\n");
+                break;
+            }
+            
+            // Sample in middle of the pulse
+            delay_us(BIT_SAMPLE_US);
+            int bit = gpio_get(DHT11_PIN);
+            data_out[i/8] = (data_out[i/8] << 1) | (bit ? 1 : 0);
+            
+            // Wait for end of bit
+            if (wait_pin_state(DHT11_PIN, 0, RESPONSE_TIMEOUT_US) < 0) {
+                uart_print("DHT11: Bit end timeout\r\n");
+                break;
+            }
+        }
+
+        // 5) Verify checksum
+        uint8_t sum = data_out[0] + data_out[1] + data_out[2] + data_out[3];
+        if (sum == data_out[4]) {
+            return 0; // Success
+        }
+        
+        uart_print("DHT11: Checksum error, retrying...\r\n");
+        delay_ms(100); // Wait before retry
     }
 
-    // 5) Checksum
-    uint8_t sum = data_out[0] + data_out[1] + data_out[2] + data_out[3];
-    if (sum != data_out[4]) {
-        uart_print("ERR: checksum mismatch\r\n");
-        return -1;
-    }
-
-    uart_print("OK: DHT11 read complete\r\n");
-    return 0;
+    return -1; // All retries failed
 }
