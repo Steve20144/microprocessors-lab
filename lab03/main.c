@@ -37,10 +37,10 @@ int main(void){
 	gpio_set_callback(PA_1, button_isr);
 	
 	gpio_set_mode(PA_1, Input);
-	while(0){	//turned off for now
+	while(1){	//turned off for now
 		//sprintf(buff, "Touch sensor: %d\r\n", gpio_get(PA_1));
 		//uart_print(buff);
-		delay_ms(500);
+		delay_ms(1000);
 		//break;
 		
 	}
@@ -51,22 +51,26 @@ int main(void){
 void button_isr(int sources) {
 	gpio_set(P_DBG_ISR, 1);
 	if ((sources << GET_PIN_INDEX(PA_1)) & (1 << GET_PIN_INDEX(PA_1))) {
-		//
-		if(!(counter_button%2)){		//if pressed at odd times, then lock
-			//button_state = true;
-			sprintf(buff2,
-					"Interrupt: Button pressed. LED Locked. Count = %d\r\n",
-		   counter_button);
-			uart_print(buff2);
+		switch (counter_button) {
+			//switch to mode B
+			case 0:
+				uart_print("switch to mode B\r\n");
+				break;
+			//switch to mode A
+			case 1:
+				uart_print("switch to mode A\r\n");
+				break;
+			//calculate new refresh rate
+			case 2:
+				uart_print("calculate new refresh rate\r\n");
+				break;
 		}
-		else {				//if pressed at even times, then unlock
-			//button_state = false;
-			sprintf(buff2,
-					"Interrupt: Button pressed. LED Unlocked. Count = %d\r\n",
-		   counter_button);
-			uart_print(buff2);
+		if (counter_button == 3) {
+			counter_button = 0;
 		}
-		counter_button++;	//increment button counter
+		else {
+			counter_button++;	//increment button counter
+		}
 	}
 	gpio_set(P_DBG_ISR, 0);
 }
