@@ -10,7 +10,7 @@
 #include "delay.h"
 #include <stdio.h>
 #include <stdbool.h>
-#define DHT11_PIN            PB_10
+#define DHT11_PIN            PA_0
 #define START_SIGNAL_MS      20       // Minimum 18ms
 #define RELEASE_HIGH_US      40       // 20-40µs
 #define RESPONSE_TIMEOUT_US  200      // Max wait for transitions
@@ -25,13 +25,13 @@ bool gpio_read(Pin pin) {
 static int wait_pin_state(Pin pin, int level, uint32_t timeout_us) {
 
     while (gpio_read(pin) != level) {
-			sprintf(buf1,"gpio: %d\r\n", gpio_read(pin));
-			uart_print(buf1);
+//			sprintf(buf1,"gpio: %d\r\n", gpio_read(pin));
+//			uart_print(buf1);
         if (timeout_us-- == 0) return -1;
         delay_us(1);
     }
-		sprintf(buf1,"pin: %d\tlevel: %d\ttimeout: %d\r\n",gpio_get(pin),level,(RESPONSE_TIMEOUT_US-timeout_us));
-		uart_print(buf1);
+//		sprintf(buf1,"pin: %d\tlevel: %d\ttimeout: %d\r\n",gpio_get(pin),level,(RESPONSE_TIMEOUT_US-timeout_us));
+//		uart_print(buf1);
     return 0;
 }
 
@@ -47,26 +47,41 @@ int dht11_poll(uint8_t* data_out) {
 
         // 2) Release bus and switch to input
         gpio_set(DHT11_PIN, 1);
+				//gpio_set_mode(DHT11_PIN, Input);
         delay_us(RELEASE_HIGH_US);
-        gpio_set_mode(DHT11_PIN, PullUp);
-
+        gpio_set_mode(DHT11_PIN, Input);
+//			int del=0;
+//			while(del<500) {
+//				
+//				sprintf(buf1,"gpio on %dus: %d\r\n", del, gpio_read(DHT11_PIN));
+//				uart_print(buf1);
+//				del = del + 10;
+//				delay_us(del);
+//			}
         // 3) Wait for sensor response
+			//delay_us(40);
         if (wait_pin_state(DHT11_PIN, 0, RESPONSE_TIMEOUT_US) < 0) {
             uart_print("DHT11: No response (low)\r\n");
 					continue;
             
         }
+			//delay_us(80);
         if (wait_pin_state(DHT11_PIN, 1, RESPONSE_TIMEOUT_US) < 0) {
             uart_print("DHT11: No response (high)\r\n");
 					continue;
             
         }
+			//while(gpio_read(DHT11_PIN) != 0) {
+				//wait for pin to go high
+			//}
         if (wait_pin_state(DHT11_PIN, 0, RESPONSE_TIMEOUT_US) < 0) {
             uart_print("DHT11: Start bit not ending\r\n");
 					continue;
             
         }
-
+//			while(gpio_read(DHT11_PIN) != 1) {
+//							//wait for pin to go low
+//						}
         // 4) Read 40 bits (5 bytes)
         for (int i = 0; i < 5; i++) data_out[i] = 0;
         
@@ -97,6 +112,10 @@ int dht11_poll(uint8_t* data_out) {
         
         uart_print("DHT11: Checksum error, retrying...\r\n");
         delay_ms(100); // Wait before retry
+				for (int k=0; k<5; k++) {
+					sprintf(buf1,"data_out[%d]: %d\r\n", k, data_out[k]);
+					uart_print(buf1);
+				}
     }
 
     return -1; // All retries failed
