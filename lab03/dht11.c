@@ -8,17 +8,20 @@
 #include "uart.h"
 #include "dht11.h"
 #include "delay.h"
-
-#define DHT11_PIN            PA_8
+#include <stdio.h>
+#define DHT11_PIN            PB_10
 #define START_SIGNAL_MS      20       // Minimum 18ms
 #define RELEASE_HIGH_US      40       // 20-40µs
 #define RESPONSE_TIMEOUT_US  200      // Max wait for transitions
 #define BIT_SAMPLE_US        40       // Sample in middle of bit
 #define MAX_RETRIES         3        // Number of read attempts
-
+char buf1[64];
 // wait until pin == level, or timeout in µs expires
 static int wait_pin_state(Pin pin, int level, uint32_t timeout_us) {
+
     while (gpio_get(pin) != level) {
+			sprintf(buf1,"gpio: %d\r\n", gpio_get(pin));
+			uart_print(buf1);
         if (timeout_us-- == 0) return -1;
         delay_us(1);
     }
@@ -27,7 +30,8 @@ static int wait_pin_state(Pin pin, int level, uint32_t timeout_us) {
 
 int dht11_poll(uint8_t* data_out) {
     int retry = 0;
-    
+    delay_ms(3000);
+	
     while (retry++ < MAX_RETRIES) {
         // 1) Send start pulse
         gpio_set_mode(DHT11_PIN, Output);
@@ -37,7 +41,7 @@ int dht11_poll(uint8_t* data_out) {
         // 2) Release bus and switch to input
         gpio_set(DHT11_PIN, 1);
         delay_us(RELEASE_HIGH_US);
-        gpio_set_mode(DHT11_PIN, PullUp);
+        gpio_set_mode(DHT11_PIN, Input);
 
         // 3) Wait for sensor response
         if (wait_pin_state(DHT11_PIN, 0, RESPONSE_TIMEOUT_US) < 0) {
