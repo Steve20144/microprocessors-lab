@@ -10,6 +10,7 @@
 #include "delay.h"
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdint.h>
 #define DHT11_PIN            PA_0
 #define START_SIGNAL_MS      20       // Minimum 18ms
 #define RELEASE_HIGH_US      40       // 20-40µs
@@ -38,7 +39,9 @@ static int wait_pin_state(Pin pin, int level, uint32_t timeout_us) {
 int dht11_poll(uint8_t* data_out) {
     int retry = 0;
     delay_ms(3000);
-	
+		uint8_t bit_array[40];
+		uint8_t byte_array[5];
+
     while (retry++ < MAX_RETRIES) {
         // 1) Send start pulse
         gpio_set_mode(DHT11_PIN, Output);
@@ -94,8 +97,12 @@ int dht11_poll(uint8_t* data_out) {
             
             // Sample in middle of the pulse
             delay_us(BIT_SAMPLE_US);
-            int bit = gpio_read(DHT11_PIN);
-            data_out[i/8] = (data_out[i/8] << 1) | (bit ? 1 : 0);
+            uint8_t bit = gpio_read(DHT11_PIN);
+						//sprintf(buf1,"bit #%d: %d\r\n", i, bit);
+						//uart_print(buf1);
+						//data_out[i/8] = (data_out[i/8] << 1) | bit;
+            bit_array[i]=bit;
+						//data_out[i/8] = (data_out[i/8] << 1) | (bit ? 1 : 0);
             
             // Wait for end of bit
             if (wait_pin_state(DHT11_PIN, 0, RESPONSE_TIMEOUT_US) < 0) {
@@ -112,9 +119,49 @@ int dht11_poll(uint8_t* data_out) {
         
         uart_print("DHT11: Checksum error, retrying...\r\n");
         delay_ms(100); // Wait before retry
+				
+				//data_out print
 				for (int k=0; k<5; k++) {
 					sprintf(buf1,"data_out[%d]: %d\r\n", k, data_out[k]);
 					uart_print(buf1);
+				}
+				
+				//byte_array calc
+				for (int i = 0; i < 5; i++) byte_array[i] = 0;
+				for (int i=0; i<40; i++) {
+					if (bit_array[i]==1) {
+						sprintf(buf1,"one pos:[%d]\r\n", i);
+						uart_print(buf1);
+					}
+					byte_array[i/8] = (byte_array[i/8] << 1) | (bit_array[i] ? 1 : 0);
+				}
+				
+				//bit_array bits->bytes and byte_array print
+				for (int k=0; k<5; k++) {
+					bit_array[k] = 
+						bit_array[k+7] + 
+						bit_array[k+6] * 2+
+						bit_array[k+5] * 2* 2+
+						bit_array[k+4] * 2* 2* 2+
+						bit_array[k+3] * 2* 2* 2* 2+
+						bit_array[k+2] * 2* 2* 2* 2* 2+
+						bit_array[k+1] * 2* 2* 2* 2* 2* 2+
+						bit_array[k+0] * 2* 2* 2* 2* 2* 2* 2;
+//					data_out[k] = 
+//						bit_array[k+7] + 
+//						bit_array[k+6] * bit_array[k+6] +
+//						bit_array[k+5] * bit_array[k+5] * bit_array[k+5] +
+//						bit_array[k+4] * bit_array[k+4] * bit_array[k+4] * bit_array[k+4] +
+//						bit_array[k+3] * bit_array[k+3] * bit_array[k+3] * bit_array[k+3] * bit_array[k+3] +
+//						bit_array[k+2] * bit_array[k+2] * bit_array[k+2] * bit_array[k+2] * bit_array[k+2] 
+//						* bit_array[k+2] +
+//						bit_array[k+1] * bit_array[k+1] * bit_array[k+1] * bit_array[k+1] * bit_array[k+1] 
+//						* bit_array[k+1] * bit_array[k+1] +
+//						bit_array[k+0] * bit_array[k+0] * bit_array[k+0] * bit_array[k+0] * bit_array[k+0] 
+//						* bit_array[k+0] * bit_array[k+0] * bit_array[k+0] +
+					sprintf(buf1,"byte_array[%d]: %d\r\n", k, byte_array[k]);
+					uart_print(buf1);
+					delay_ms(50);
 				}
     }
 
