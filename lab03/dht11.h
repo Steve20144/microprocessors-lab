@@ -17,6 +17,6 @@
  *                        [4] checksum.
  *  \return 0 on success (checksum valid), -1 on failure.
  */
-int dht11_poll(uint8_t* data_out);
+uint8_t* dht11_poll();
 
 #endif // DHT11_H
