@@ -7,23 +7,26 @@
 
 
 int main(void){
-    static uint8_t* results;
-    char buff[64];
-    
-    uart_init(115200);
-    uart_enable();
-    
-    __enable_irq();
-    
-    dht11_poll(results);
-        
-        sprintf(buff, "Humidity: %d\r\nTemperature: %d\r\n", results[0], results[2]);
-        uart_print(buff);
-    
-    while(1){
-        
-        
-        
-        
-    }
+	static uint8_t* results;
+	char buff[64];
+	
+	uart_init(115200);
+	uart_enable();
+	gpio_set_mode(PB_10, Output);
+	gpio_set(PB_10, 1);
+
+	
+	__enable_irq();
+	
+	dht11_poll(results);
+		
+		sprintf(buff, "Humidity: %d\r\nTemperature: %d\r\n", results[0], results[2]);
+		uart_print(buff);
+	
+	while(1){
+		
+		
+		
+		
+	}
 }
