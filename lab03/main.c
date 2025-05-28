@@ -15,7 +15,6 @@ volatile char buff2[64];
 //volatile uint8_t* results;
 int main(void){
 	static uint8_t* results;
-	//results = malloc(sizeof(uint8_t) * 5);
 	char buff[64];
 	
 	uart_init(115200);
@@ -27,9 +26,10 @@ int main(void){
 	
 	__enable_irq();
 	
-	dht11_poll(results);
+	results = dht11_poll();
 		
-		sprintf(buff, "Humidity: %d\r\nTemperature: %d\r\n", results[0], results[2]);
+		sprintf(buff, "Humidity: %d.%d%%RH\r\nTemperature: %d.%dC\r\n", 
+			results[0], results[1], results[2], results[3]);
 		uart_print(buff);
 	
 	gpio_set_mode(PA_1, PullDown);           // on-board switch as pull-down
@@ -44,7 +44,7 @@ int main(void){
 		//break;
 		
 	}
-	free(results);
+	//free(results);
 }
 
 // Button press ISR: toggle lock state on each press
