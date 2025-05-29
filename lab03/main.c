@@ -42,7 +42,6 @@ volatile int humidity_cnt = 0;
 volatile int temperature_reset_cnt = 0;
 volatile int humidity_reset_cnt = 0;
 volatile uint8_t* results;
-volatile bool status_called = 0;
 volatile bool sampling = false;
 volatile char buff2[64];
 
@@ -301,7 +300,19 @@ static void application_loop(void) {
         }
         uart_print("\r\n");
 				
-				
+					//status start
+//				if (strcmp(buff, status_string) == 1) {
+					for (int i=0; i<6; i++) {
+						if (buff[i] != status_string[i]) {
+							break;
+						}
+						if (i==6) {
+							status_report();
+							buff[0]='d';
+						}
+					}
+					//uart_print (buff);debug
+				//status stop	
 
         // Dispatch choice
         switch (buff[0]) {
@@ -459,7 +470,7 @@ static void decrement_sampling() {
 
 // Print current mode and counters if requested
 void status_report(void) {
-    if (status_called) {
+//    if (status_called) {
         if (profile == mode_a) {
             uart_print("Mode A\r\n");
         } else {
@@ -467,7 +478,7 @@ void status_report(void) {
         }
         sprintf(buff2, "Profile switches: %d\r\n", counter_button);
         uart_print(buff2);
-    }
+//    }
 }
 
 // UART RX ISR: enqueue all received bytes
