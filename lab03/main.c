@@ -27,7 +27,7 @@
 #define BAUD_RATE             115200
 #define UART_RX_BUFFER_SIZE   128
 #define MAX_DIGITS            128
-#define LED_PIN               PA_2
+#define LED_PIN               PA_4
 #define PINCODE 							123
 #define CLK_FREQ_TRUE  16000000UL
 
@@ -62,6 +62,7 @@ void timer_isr(void);            // for the timer interrupt
 void status_report(void);        // for the status report
 void dht_print(void);            // prints stuff from dht
 void alert_mode(void);           // actions when mode_b is on
+void blink_alert(void);
 
 static void sample_dht11(void);
 static void board_init(void);
@@ -120,7 +121,7 @@ static void sample_dht11(void){
 			free(results);
 			NVIC_SystemReset();    // reset if loop ever returns
 		}
-    free(results);
+    //free(results);
 }
 
 
@@ -139,8 +140,9 @@ static void board_init(void) {
     uart_enable();
 
     // --- (LED_PIN setup, disabled if not working) ---
-    // gpio_set_mode(LED_PIN, Output);
-    // gpio_set(LED_PIN, 0);
+    gpio_set_mode(LED_PIN, Output);
+    gpio_set(LED_PIN, 0);
+		leds_init();
 
     // --- Initialize DHT11 pin and debug print ---
     gpio_set_mode(PA_0, Output);
@@ -377,14 +379,14 @@ void timer_isr(void) {
 	//sample_dht11();
 	if( (ticks%((uint64_t)refresh_rate )) == 0){
 		sample_dht11();
-		//ticks = 0;
+		alert_mode();
 		uart_print("sample++;\r\n");
+		free(results);
 	}
+	blink_alert();
 	sprintf(buff2,"tick: %llu", ticks);
 	uart_print(buff2);
-	ticks++;
-	//test();
-	
+	ticks++;	
 }
 
 // Read and print DHT11 data
@@ -413,15 +415,28 @@ void alert_mode(void) {
             humidity_cnt--;
         }
 
-        // Blink or turn off LED
-        if (temperature_cnt > 0 || humidity_cnt > 0) {
-            gpio_toggle(LED_PIN);
-        } else {
-            gpio_set(LED_PIN, 0);
-        }
+//        // Blink or turn off LED
+//        if (temperature_cnt > 0 || humidity_cnt > 0) {
+//            gpio_toggle(LED_PIN);
+//        } else {
+//            gpio_set(LED_PIN, 0);
+//        }
     }
 }
 
+void blink_alert(void) {
+	if (profile == mode_b) {
+			// Blink or turn off LED
+		if (temperature_cnt > 0 || humidity_cnt > 0) {
+				gpio_toggle(LED_PIN);
+		} else {
+				gpio_set(LED_PIN, 0);
+		}
+	}
+	else {
+		gpio_set(LED_PIN, 0);
+	}
+}
 static void increment_sampling() {
     // only allow up to 10 seconds
     if (refresh_rate < 10) {
