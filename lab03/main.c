@@ -23,9 +23,18 @@
 #define BAUD_RATE             115200
 #define UART_RX_BUFFER_SIZE   128
 #define MAX_DIGITS            128
+#define LED_PIN								PA_2
 
 volatile int counter_button = 0;
 volatile char buff2[64];
+typedef enum { mode_a, mode_b} mode_profile;
+volatile mode_profile profile = mode_a;
+volatile int refresh_rate = 1;
+volatile int aem = 12345;
+volatile uint8_t* results;
+volatile int temperature_cnt = 0;
+volatile int humidity_cnt = 0;
+volatile bool status_called = 0;
 
 // UART RX buffer and queue
 volatile char buff[UART_RX_BUFFER_SIZE];
@@ -36,10 +45,13 @@ Queue rx_queue;
 void button_isr(int sources);	// for the touch sensor interrupt
 void uart_rx_isr(uint8_t rx);	// for the uart
 void timer_isr(void);					// for the timer interrupt
+void status_report(void);			// for the status report
+void dht_print(void);					// prints stuff from dht
+void alert_mode(void);				// actions when mode_b is on
 
 int main(void){
 	uint8_t rx_char = 0;
-	static uint8_t* results;
+	//static uint8_t* results;
 	char buff[64];
 	
 	// --- Initialize GPIO touch-sensor ---
@@ -54,13 +66,14 @@ int main(void){
 	uart_set_rx_callback(uart_rx_isr);
 	uart_enable();
 
-	// --- Initialize LEDs ---
-	leds_init();
+	// --- Initialize LED ---
+	gpio_set_mode(LED_PIN, Output);
+	gpio_set(LED_PIN, 0);
 	
 	// --- Initialize DHT11 ---
 	gpio_set_mode(PA_0, Output);
 	gpio_set(PA_0, 1);
-	sprintf(buff,"gpio: %d\r\n", gpio_get(PA_0));
+	sprintf(buff,"\r\ngpio: %d\r\n", gpio_get(PA_0));
 	uart_print(buff);
 	
 	// --- Initialize 0.1s timer (100,000 µs) ---
@@ -133,42 +146,115 @@ int main(void){
 			continue;
 		}
 	// UART input #END
-
-	timer_enable();	//start timer isr
+	
 	}
-	//timer_enable();	//start timer isr
+	timer_enable();	//start timer isr
 }
 
 // Button press ISR: toggle lock state on each press
 void button_isr(int sources) {
 	gpio_set(P_DBG_ISR, 1);
 	if ((sources << GET_PIN_INDEX(PA_1)) & (1 << GET_PIN_INDEX(PA_1))) {
-		switch (counter_button) {
+		switch (counter_button%3) {
 			//switch to mode B
 			case 0:
+				profile = mode_b;
 				uart_print("switch to mode B\r\n");
 				break;
 			//switch to mode A
 			case 1:
+				profile = mode_a;
 				uart_print("switch to mode A\r\n");
 				break;
 			//calculate new refresh rate
 			case 2:
-				uart_print("calculate new refresh rate\r\n");
+				refresh_rate=( ( (aem%100-aem%10)/10 ) + aem%10 );
+				if (refresh_rate<2) {
+					refresh_rate = 2;	//minimum rate
+				}
+				else if (refresh_rate>10) {
+					refresh_rate = 10;	//maximum rate
+				}
+				sprintf(buff2, "New refresh rate from AEM: %d\r\n", refresh_rate);
+				uart_print(buff2);
 				break;
 		}
-		if (counter_button == 3) {
-			counter_button = 0;
-		}
-		else {
-			counter_button++;	//increment button counter
-		}
+//		if (counter_button == 3) {
+//			counter_button = 0;
+//		}
+//		else {
+		counter_button++;	//increment button counter
+//		}
 	}
 	gpio_set(P_DBG_ISR, 0);
 }
 
 void timer_isr(void) {
 	//todo
+}
+
+void dht_print(void) {
+	results = dht11_poll();
+	sprintf(buff, "Humidity: %d.%d%%RH\r\nTemperature: %d.%dC\r\n", 
+		results[0], results[1], results[2], results[3]);
+	uart_print(buff);
+	free(results);
+}
+
+void alert_mode(void) {
+	if (profile==mode_b) {
+		//Temperature check
+		if (results[2]>25) {
+			temperature_cnt=5;
+		}
+		else {
+			if (temperature_cnt>0) {
+				temperature_cnt--;
+			}
+			else {
+				temperature_cnt=0;
+			}
+		}
+		//Humidity check
+		if (results[0]>60) {
+			humidity_cnt=5;
+		}
+		else {
+			if (humidity_cnt>0) {
+				humidity_cnt--;
+			}
+			else {
+				humidity_cnt=0;
+			}
+		}
+		//Blink led if temperature or humidity out of limits
+		if ( (temperature_cnt>0) || (humidity_cnt>0) ) {
+			gpio_toggle(LED_PIN);	//might not turn it off the last time
+		}
+		else if ( (temperature_cnt==0) && (humidity_cnt==0) ) {
+			gpio_set(LED_PIN, 0);	//turns it off the last time
+		}
+	}
+}
+
+void status_report(void) {
+	int profile_switches=0;
+	profile_switches = ( ((counter_button/3) * 2) + (counter_button%3) );
+	if (status_called==1) {
+		//print mode
+		if (profile==mode_a) {
+			uart_print("Mode A/r/n");
+		}
+		else {
+			uart_print("Mode B/r/n");
+		}
+		//print dht
+		dht_print();
+		//profile switches
+		
+		sprintf(buff2, "Profile switches: %d", profile_switches);
+		uart_print(buff2);
+	}
 }
 
 // Push valid chars into rx_queue
