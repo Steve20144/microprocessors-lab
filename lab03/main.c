@@ -67,13 +67,14 @@ int main(void){
 	uart_enable();
 
 	// --- Initialize LED ---
-	gpio_set_mode(LED_PIN, Output);
-	gpio_set(LED_PIN, 0);
+	//DOESNT WORK IF I ENABLE THESE
+	//gpio_set_mode(LED_PIN, Output);
+	//gpio_set(LED_PIN, 0);
 	
 	// --- Initialize DHT11 ---
 	gpio_set_mode(PA_0, Output);
 	gpio_set(PA_0, 1);
-	sprintf(buff,"\r\ngpio: %d\r\n", gpio_get(PA_0));
+	sprintf(buff,"gpio: %d\r\n", gpio_get(PA_0));
 	uart_print(buff);
 	
 	// --- Initialize 0.1s timer (100,000 µs) ---
@@ -146,45 +147,36 @@ int main(void){
 			continue;
 		}
 	// UART input #END
-	
-	}
+
 	timer_enable();	//start timer isr
+	}
+	//timer_enable();	//start timer isr
 }
 
 // Button press ISR: toggle lock state on each press
 void button_isr(int sources) {
 	gpio_set(P_DBG_ISR, 1);
 	if ((sources << GET_PIN_INDEX(PA_1)) & (1 << GET_PIN_INDEX(PA_1))) {
-		switch (counter_button%3) {
+		switch (counter_button) {
 			//switch to mode B
 			case 0:
-				profile = mode_b;
 				uart_print("switch to mode B\r\n");
 				break;
 			//switch to mode A
 			case 1:
-				profile = mode_a;
 				uart_print("switch to mode A\r\n");
 				break;
 			//calculate new refresh rate
 			case 2:
-				refresh_rate=( ( (aem%100-aem%10)/10 ) + aem%10 );
-				if (refresh_rate<2) {
-					refresh_rate = 2;	//minimum rate
-				}
-				else if (refresh_rate>10) {
-					refresh_rate = 10;	//maximum rate
-				}
-				sprintf(buff2, "New refresh rate from AEM: %d\r\n", refresh_rate);
-				uart_print(buff2);
+				uart_print("calculate new refresh rate\r\n");
 				break;
 		}
-//		if (counter_button == 3) {
-//			counter_button = 0;
-//		}
-//		else {
-		counter_button++;	//increment button counter
-//		}
+		if (counter_button == 3) {
+			counter_button = 0;
+		}
+		else {
+			counter_button++;	//increment button counter
+		}
 	}
 	gpio_set(P_DBG_ISR, 0);
 }
@@ -249,7 +241,7 @@ void status_report(void) {
 			uart_print("Mode B/r/n");
 		}
 		//print dht
-		dht_print();
+		//dht_print();
 		//profile switches
 		
 		sprintf(buff2, "Profile switches: %d", profile_switches);
