@@ -20,6 +20,8 @@
 #include "queue.h"        // Simple FIFO queue
 #include "gpio.h"         // GPIO driver
 #include "delay.h"        // Busy-wait delay functions
+#include "customtimers.h"
+
 
 #define BAUD_RATE             115200
 #define UART_RX_BUFFER_SIZE   128
@@ -37,6 +39,7 @@ volatile uint8_t* results;
 volatile int temperature_cnt = 0;
 volatile int humidity_cnt = 0;
 volatile bool status_called = 0;
+volatile int timer = 1000;
 
 // UART RX buffer and queue
 volatile char buff[UART_RX_BUFFER_SIZE];
@@ -55,6 +58,7 @@ static void sample_dht11(void);
 static void board_init(void);
 static void application_loop(void);
 static void system_login(void);
+static void increment_sampling(void);
 
 int main(void) {
     board_init();          // one-time setup
@@ -109,7 +113,7 @@ static void board_init(void) {
     }
 
     // --- Initialize 0.1s timer ---
-    timer_init(CLK_FREQ/10);
+    timer_init(timer);
     timer_disable();
     timer_set_callback(timer_isr);
 
@@ -189,6 +193,8 @@ static void system_login(void) {
 // Main loop: read UART line, then enable timer for periodic work
 static void application_loop(void) {
     while (1) {
+				
+			
         // --- Present menu ---
         uart_print("\r\n=== Main Menu ===\r\n");
         uart_print("a) Increase Sampling Rate by 1s\r\n");
@@ -196,6 +202,8 @@ static void application_loop(void) {
         uart_print("c) Change View\r\n");
         uart_print("d) Print latest sample\r\n");
         uart_print("Enter choice: ");
+			
+				
 
         // Read one line of input into buff
         buff_index = 0;
@@ -225,7 +233,7 @@ static void application_loop(void) {
         switch (buff[0]) {
             case 'a':
             case 'A':
-                //option_a();
+							increment_sampling();
                 break;
             case 'b':
             case 'B':
@@ -237,15 +245,14 @@ static void application_loop(void) {
                 break;
             case 'd':
             case 'D':
-                sample_dht11();
+                
                 break;
             default:
                 uart_print("Invalid option, please enter a, b, c, or d.\r\n");
                 continue;
         }
 
-        // After handling, optionally start timer-driven work
-        timer_enable();
+       
     }
 }
 
@@ -267,6 +274,8 @@ void button_isr(int sources) {
 // Periodic timer ISR
 void timer_isr(void) {
     // TODO: periodic activity (e.g., call dht_print, alert_mode)
+	sample_dht11();
+	
 }
 
 // Read and print DHT11 data
@@ -303,6 +312,20 @@ void alert_mode(void) {
         }
     }
 }
+
+static void increment_sampling(){
+	 // only allow up to 10 seconds (i.e. 10000 ms)
+            if (timer < 10000) {
+                timer += 1000;              // bump by 1 s
+                timer_disable();            // reconfigure the hardware timer
+                timer_init(timer);
+                char msg[64];
+                sprintf(msg, "Sampling rate set to %d s\r\n", timer / 1000);
+                uart_print(msg);
+            } else {
+                uart_print("Error: maximum sampling interval is 10 s\r\n");
+            }
+					}
 
 // Print current mode and counters if requested
 void status_report(void) {
