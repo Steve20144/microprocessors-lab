@@ -31,17 +31,19 @@
 #define PINCODE 							123
 #define CLK_FREQ_TRUE  16000000UL
 
+
+volatile int ticks =0;
 volatile int counter_button = 0;
 volatile char buff2[64];
 typedef enum { mode_a, mode_b } mode_profile;
 volatile mode_profile profile = mode_a;
-volatile int refresh_rate = 1;
+volatile int refresh_rate = 100;
 volatile int aem = 12345;
 volatile uint8_t* results;
 volatile int temperature_cnt = 0;
 volatile int humidity_cnt = 0;
 volatile bool status_called = 0;
-volatile int timer = 1000;
+volatile unsigned long int timer = CLK_FREQ /100;
 volatile bool sampling = false;
 
 // UART RX buffer and queue
@@ -134,9 +136,9 @@ static void board_init(void) {
 
     // --- Set interrupt priorities and enable IRQs ---
     NVIC_SetPriorityGrouping(2);
-    NVIC_SetPriority(TIM2_IRQn,       10);
-    NVIC_SetPriority(USART2_IRQn,     1);
-    NVIC_SetPriority(EXTI15_10_IRQn,  20);
+    NVIC_SetPriority(TIM2_IRQn,       2);
+    NVIC_SetPriority(USART2_IRQn,     3);
+    NVIC_SetPriority(EXTI15_10_IRQn,  1);
     __enable_irq();
 
     
@@ -302,7 +304,11 @@ void button_isr(int sources) {
 // Periodic timer ISR
 void timer_isr(void) {
     // TODO: periodic activity (e.g., call dht_print, alert_mode)
-	sample_dht11();
+	if(ticks == refresh_rate){
+		sample_dht11();
+		ticks = 0;
+	}
+	ticks++;
 	//test();
 	
 }
@@ -344,8 +350,8 @@ void alert_mode(void) {
 
 static void increment_sampling() {
     // only allow up to 10 seconds
-    if (timer < 10000) {
-        timer += 1000;                 // bump by 1 s (in CPU cycles)
+    if (refresh_rate < 100) {
+        refresh_rate += 10;                 // bump by 1 s (in CPU cycles)
         timer_disable();
         timer_init(timer);
         timer_set_callback(timer_isr);
@@ -360,8 +366,8 @@ static void increment_sampling() {
 
 static void decrement_sampling() {
     // only allow down to 1 second
-    if (timer > 1000) {
-        timer -= 1000;                 // bump down by 1 s (in CPU cycles)
+    if (timer > 10) {
+        timer -= 10;                 // bump down by 1 s (in CPU cycles)
         timer_disable();
         timer_init(timer);
         timer_set_callback(timer_isr);
@@ -391,3 +397,4 @@ void status_report(void) {
 void uart_rx_isr(uint8_t rx) {
     queue_enqueue(&rx_queue, rx);
 }
+
