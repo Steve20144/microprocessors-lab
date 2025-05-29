@@ -29,6 +29,7 @@
 #define MAX_DIGITS            128
 #define LED_PIN               PA_2
 #define PINCODE 							123
+#define CLK_FREQ_TRUE  16000000UL
 
 volatile int counter_button = 0;
 volatile char buff2[64];
@@ -40,7 +41,7 @@ volatile uint8_t* results;
 volatile int temperature_cnt = 0;
 volatile int humidity_cnt = 0;
 volatile bool status_called = 0;
-volatile int timer = 1000000;
+volatile int timer = 1000;
 volatile bool sampling = false;
 
 // UART RX buffer and queue
@@ -62,9 +63,20 @@ static void application_loop(void);
 static void system_login(void);
 static void increment_sampling(void);
 static void decrement_sampling(void);
+static void test(void);
+
+extern uint32_t SystemCoreClock;  // core clock in Hz
+
+static void test(void){
+		char buf[64];
+    sprintf(buf, "Core clock = %lu Hz\r\n", SystemCoreClock);
+    uart_print(buf);
+	
+}
 
 int main(void) {
     board_init();          // one-time setup
+		//test();
 		system_login();					//Password and AEM logic
     application_loop();    // runs until you want to exit
     NVIC_SystemReset();    // reset if loop ever returns
@@ -122,9 +134,9 @@ static void board_init(void) {
 
     // --- Set interrupt priorities and enable IRQs ---
     NVIC_SetPriorityGrouping(2);
-    NVIC_SetPriority(TIM2_IRQn,       64);
+    NVIC_SetPriority(TIM2_IRQn,       10);
     NVIC_SetPriority(USART2_IRQn,     1);
-    NVIC_SetPriority(EXTI15_10_IRQn,  200);
+    NVIC_SetPriority(EXTI15_10_IRQn,  20);
     __enable_irq();
 
     
@@ -291,6 +303,7 @@ void button_isr(int sources) {
 void timer_isr(void) {
     // TODO: periodic activity (e.g., call dht_print, alert_mode)
 	sample_dht11();
+	//test();
 	
 }
 
@@ -329,35 +342,35 @@ void alert_mode(void) {
     }
 }
 
-static void increment_sampling(){
-	 // only allow up to 10 seconds (i.e. 10000 ms)
-            if (timer < 10000000) {
-                timer += 1000000;              // bump by 1 s
-								timer_disable();
-								timer_init(timer);
-								timer_disable();
-								timer_set_callback(timer_isr);
-                char msg[64];
-                sprintf(msg, "Sampling rate set to %d s\r\n", timer / 1000000);
-                uart_print(msg);
-            } else {
-                uart_print("Error: maximum sampling interval is 10 s\r\n");
-            }
-					}
+static void increment_sampling() {
+    // only allow up to 10 seconds
+    if (timer < 10000) {
+        timer += 1000;                 // bump by 1 s (in CPU cycles)
+        timer_disable();
+        timer_init(timer);
+        timer_set_callback(timer_isr);
+        timer_enable();
+        char msg[64];
+        sprintf(msg, "Sampling rate set to %lu s\r\n", timer / (CLK_FREQ_TRUE/100));
+        uart_print(msg);
+    } else {
+        uart_print("Error: maximum sampling interval is 10 s\r\n");
+    }
+}
 
 static void decrement_sampling() {
-    // only allow down to 1 second (i.e. 1000 ms)
-    if (timer > 1000000) {
-        timer -= 1000000;              // bump down by 1 s
-				timer_disable();
+    // only allow down to 1 second
+    if (timer > 1000) {
+        timer -= 1000;                 // bump down by 1 s (in CPU cycles)
+        timer_disable();
         timer_init(timer);
-				timer_disable();
-				timer_set_callback(timer_isr);
+        timer_set_callback(timer_isr);
+        timer_enable();
         char msg[64];
-        sprintf(msg, "Sampling rate set to %d s\r\n", timer / 1000000);
-        uart_print(msg);            // send to UART :contentReference[oaicite:2]{index=2}
+        sprintf(msg, "Sampling rate set to %lu s\r\n", timer / (CLK_FREQ_TRUE/100));
+        uart_print(msg);
     } else {
-        uart_print("Error: minimum sampling interval is 1 s\r\n"); // lowest value reached :contentReference[oaicite:3]{index=3}
+        uart_print("Error: minimum sampling interval is 1 s\r\n");
     }
 }
 					// Print current mode and counters if requested
