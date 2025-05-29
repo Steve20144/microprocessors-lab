@@ -28,7 +28,7 @@ typedef enum {
     BOTH_MODE
 } display_mode_t;
 
-volatile display_mode_t disp_mode = TEMP_MODE;
+volatile display_mode_t disp_mode = BOTH_MODE;
 
 typedef enum { mode_a, mode_b } mode_profile;
 volatile mode_profile profile = mode_a;
@@ -301,17 +301,11 @@ static void application_loop(void) {
         uart_print("\r\n");
 				
 					//status start
-//				if (strcmp(buff, status_string) == 1) {
-					for (int i=0; i<6; i++) {
-						if (buff[i] != status_string[i]) {
-							break;
-						}
-						if (i==6) {
+				if (strcmp(buff, "status") == 0) {
 							status_report();
 							buff[0]='d';
-						}
 					}
-					//uart_print (buff);debug
+
 				//status stop	
 
         // Dispatch choice
