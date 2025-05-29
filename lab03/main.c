@@ -21,6 +21,7 @@
 #include "gpio.h"         // GPIO driver
 #include "delay.h"        // Busy-wait delay functions
 #include "customtimers.h"
+#include <stdbool.h>
 
 
 #define BAUD_RATE             115200
@@ -39,7 +40,8 @@ volatile uint8_t* results;
 volatile int temperature_cnt = 0;
 volatile int humidity_cnt = 0;
 volatile bool status_called = 0;
-volatile int timer = 1000;
+volatile int timer = 1000000;
+volatile bool sampling = false;
 
 // UART RX buffer and queue
 volatile char buff[UART_RX_BUFFER_SIZE];
@@ -59,6 +61,7 @@ static void board_init(void);
 static void application_loop(void);
 static void system_login(void);
 static void increment_sampling(void);
+static void decrement_sampling(void);
 
 int main(void) {
     board_init();          // one-time setup
@@ -119,9 +122,9 @@ static void board_init(void) {
 
     // --- Set interrupt priorities and enable IRQs ---
     NVIC_SetPriorityGrouping(2);
-    NVIC_SetPriority(TIM2_IRQn,       2);
+    NVIC_SetPriority(TIM2_IRQn,       64);
     NVIC_SetPriority(USART2_IRQn,     1);
-    NVIC_SetPriority(EXTI15_10_IRQn,  3);
+    NVIC_SetPriority(EXTI15_10_IRQn,  200);
     __enable_irq();
 
     
@@ -237,7 +240,7 @@ static void application_loop(void) {
                 break;
             case 'b':
             case 'B':
-                //option_b();
+                decrement_sampling();
                 break;
             case 'c':
             case 'C':
@@ -245,8 +248,21 @@ static void application_loop(void) {
                 break;
             case 'd':
             case 'D':
-                
-                break;
+							sampling = true;
+							timer_enable();
+							uart_print("Sampling started. Press 's' to stop.\r\n");
+							break;
+						case 's':
+						case 'S':
+							if(sampling){
+								sampling = false;
+								timer_disable();
+								uart_print("Sampling stopped. Back to menu.\r\n");
+							}else{
+								uart_print("Not currently sampling.\r\n");
+							}
+							break;
+						
             default:
                 uart_print("Invalid option, please enter a, b, c, or d.\r\n");
                 continue;
@@ -315,19 +331,36 @@ void alert_mode(void) {
 
 static void increment_sampling(){
 	 // only allow up to 10 seconds (i.e. 10000 ms)
-            if (timer < 10000) {
-                timer += 1000;              // bump by 1 s
-                timer_disable();            // reconfigure the hardware timer
-                timer_init(timer);
+            if (timer < 10000000) {
+                timer += 1000000;              // bump by 1 s
+								timer_disable();
+								timer_init(timer);
+								timer_disable();
+								timer_set_callback(timer_isr);
                 char msg[64];
-                sprintf(msg, "Sampling rate set to %d s\r\n", timer / 1000);
+                sprintf(msg, "Sampling rate set to %d s\r\n", timer / 1000000);
                 uart_print(msg);
             } else {
                 uart_print("Error: maximum sampling interval is 10 s\r\n");
             }
 					}
 
-// Print current mode and counters if requested
+static void decrement_sampling() {
+    // only allow down to 1 second (i.e. 1000 ms)
+    if (timer > 1000000) {
+        timer -= 1000000;              // bump down by 1 s
+				timer_disable();
+        timer_init(timer);
+				timer_disable();
+				timer_set_callback(timer_isr);
+        char msg[64];
+        sprintf(msg, "Sampling rate set to %d s\r\n", timer / 1000000);
+        uart_print(msg);            // send to UART :contentReference[oaicite:2]{index=2}
+    } else {
+        uart_print("Error: minimum sampling interval is 1 s\r\n"); // lowest value reached :contentReference[oaicite:3]{index=3}
+    }
+}
+					// Print current mode and counters if requested
 void status_report(void) {
     int profile_switches = ((counter_button / 3) * 2) + (counter_button % 3);
     if (status_called) {
