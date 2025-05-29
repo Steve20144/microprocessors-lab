@@ -1,12 +1,5 @@
-//#include "gpio.h"
-//#include "platform.h"
-//#include "stm32f4xx.h"
-//#include "uart.h"
 #include "dht11.h"
-//#include <stdio.h>
-//#include "delay.h"
 #include <stdlib.h>
-//#include <stdint.h>
 #include "stm32f4xx.h"    // CMSIS/LL definitions
 #include "platform.h"     // Board-specific base addresses, IRQs, pin-mux macros
 #include <stdio.h>        // sprintf, printf
@@ -20,7 +13,6 @@
 #include "queue.h"        // Simple FIFO queue
 #include "gpio.h"         // GPIO driver
 #include "delay.h"        // Busy-wait delay functions
-//#include "customtimers.h"
 #include <stdbool.h>
 
 
@@ -29,26 +21,22 @@
 #define MAX_DIGITS            128
 #define LED_PIN               PA_4
 #define PINCODE 							123
-#define CLK_FREQ_TRUE  16000000UL
 
-
-volatile uint64_t ticks =0;
-volatile int counter_button = 0;
-volatile char buff2[64];
 typedef enum { mode_a, mode_b } mode_profile;
 volatile mode_profile profile = mode_a;
+volatile uint64_t ticks =0;
+volatile int counter_button = 0;
 volatile int refresh_rate = 5;
 volatile int aem = 0;
-volatile uint8_t* results;
+volatile int timer = 840000;
 volatile int temperature_cnt = 0;
 volatile int humidity_cnt = 0;
-volatile bool status_called = 0;
-//volatile unsigned long int timer = CLK_FREQ /100;
-//volatile int timestep = 6000;
-volatile int timer = 840000;
-volatile bool sampling = false;
 volatile int temperature_reset_cnt = 0;
 volatile int humidity_reset_cnt = 0;
+volatile uint8_t* results;
+volatile bool status_called = 0;
+volatile bool sampling = false;
+volatile char buff2[64];
 
 // UART RX buffer and queue
 volatile char buff[UART_RX_BUFFER_SIZE];
@@ -60,7 +48,6 @@ void button_isr(int sources);    // for the touch sensor interrupt
 void uart_rx_isr(uint8_t rx);    // for the uart
 void timer_isr(void);            // for the timer interrupt
 void status_report(void);        // for the status report
-void dht_print(void);            // prints stuff from dht
 void alert_mode(void);           // actions when mode_b is on
 void blink_alert(void);
 
@@ -70,23 +57,11 @@ static void application_loop(void);
 static void system_login(void);
 static void increment_sampling(void);
 static void decrement_sampling(void);
-static void test(void);
-
-extern uint32_t SystemCoreClock;  // core clock in Hz
-
-static void test(void){
-		char buf[64];
-    sprintf(buf, "Core clock = %lu Hz\r\n", SystemCoreClock);
-    uart_print(buf);
-	
-}
 
 int main(void) {
     board_init();          // one-time setup
-		//test();
 		system_login();					//Password and AEM logic
     application_loop();    // runs until you want to exit
-    //NVIC_SystemReset();    // reset if loop ever returns
     while (1) { /* should never get here */ }
 }
 
@@ -302,6 +277,8 @@ static void application_loop(void) {
             buff[buff_index - 1] = '\0';
         }
         uart_print("\r\n");
+				
+				
 
         // Dispatch choice
         switch (buff[0]) {
@@ -376,26 +353,16 @@ void button_isr(int sources) {
 // Periodic timer ISR
 void timer_isr(void) {
     // TODO: periodic activity (e.g., call dht_print, alert_mode)
-	//sample_dht11();
 	if( (ticks%((uint64_t)refresh_rate )) == 0){
 		sample_dht11();
 		alert_mode();
-		uart_print("sample++;\r\n");
+		//uart_print("sample++;\r\n");
 		free(results);
 	}
 	blink_alert();
-	sprintf(buff2,"tick: %llu", ticks);
-	uart_print(buff2);
+	//sprintf(buff2,"tick: %llu", ticks);
+	//uart_print(buff2);
 	ticks++;	
-}
-
-// Read and print DHT11 data
-void dht_print(void) {
-    results = dht11_poll();
-    sprintf(buff, "Humidity: %d.%d%%RH\r\nTemperature: %d.%dC\r\n",
-            results[0], results[1], results[2], results[3]);
-    uart_print(buff);
-    free(results);
 }
 
 // If in mode_b, check thresholds and blink LED_PIN
@@ -441,14 +408,8 @@ static void increment_sampling() {
     // only allow up to 10 seconds
     if (refresh_rate < 10) {
         refresh_rate++;                 // bump by 1 s (in CPU cycles)
-//        timer_disable();
-//        timer_init(timer);
-//        timer_set_callback(timer_isr);
-//        timer_enable();
-        char msg[64];
-//        sprintf(msg, "Sampling rate set to %lu s\r\n", timer / (CLK_FREQ_TRUE/100));
-				sprintf(msg, "Sampling rate set to %d s\r\n", refresh_rate);
-        uart_print(msg);
+				sprintf(buff2, "Sampling rate set to %d s\r\n", refresh_rate);
+        uart_print(buff2);
     } else {
         uart_print("Error: maximum sampling interval is 10 s\r\n");
     }
@@ -458,28 +419,22 @@ static void decrement_sampling() {
     // only allow down to 1 second
     if (refresh_rate > 2) {
         refresh_rate--;                 // bump down by 1 s (in CPU cycles)
-//        timer_disable();
-//        timer_init(timer);
-//        timer_set_callback(timer_isr);
-//        timer_enable();
-        char msg[64];
-//        sprintf(msg, "Sampling rate set to %lu s\r\n", timer / (CLK_FREQ_TRUE/100));
-        sprintf(msg, "Sampling rate set to %d s\r\n", refresh_rate);
-				uart_print(msg);
+        sprintf(buff2, "Sampling rate set to %d s\r\n", refresh_rate);
+				uart_print(buff2);
     } else {
         uart_print("Error: minimum sampling interval is 1 s\r\n");
     }
 }
-					// Print current mode and counters if requested
+
+// Print current mode and counters if requested
 void status_report(void) {
-    int profile_switches = ((counter_button / 3) * 2) + (counter_button % 3);
     if (status_called) {
         if (profile == mode_a) {
             uart_print("Mode A\r\n");
         } else {
             uart_print("Mode B\r\n");
         }
-        sprintf(buff2, "Profile switches: %d\r\n", profile_switches);
+        sprintf(buff2, "Profile switches: %d\r\n", counter_button);
         uart_print(buff2);
     }
 }
