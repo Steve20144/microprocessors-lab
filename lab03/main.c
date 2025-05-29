@@ -32,7 +32,7 @@
 #define CLK_FREQ_TRUE  16000000UL
 
 
-volatile int ticks =0;
+volatile uint64_t ticks =0;
 volatile int counter_button = 0;
 volatile char buff2[64];
 typedef enum { mode_a, mode_b } mode_profile;
@@ -375,12 +375,12 @@ void button_isr(int sources) {
 void timer_isr(void) {
     // TODO: periodic activity (e.g., call dht_print, alert_mode)
 	//sample_dht11();
-	if( (ticks%refresh_rate) == 0){
+	if( (ticks%((uint64_t)refresh_rate )) == 0){
 		sample_dht11();
 		//ticks = 0;
 		uart_print("sample++;\r\n");
 	}
-	sprintf(buff2,"tick: %d", ticks);
+	sprintf(buff2,"tick: %llu", ticks);
 	uart_print(buff2);
 	ticks++;
 	//test();
