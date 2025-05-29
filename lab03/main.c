@@ -20,7 +20,7 @@
 #include "queue.h"        // Simple FIFO queue
 #include "gpio.h"         // GPIO driver
 #include "delay.h"        // Busy-wait delay functions
-#include "customtimers.h"
+//#include "customtimers.h"
 #include <stdbool.h>
 
 
@@ -37,14 +37,18 @@ volatile int counter_button = 0;
 volatile char buff2[64];
 typedef enum { mode_a, mode_b } mode_profile;
 volatile mode_profile profile = mode_a;
-volatile int refresh_rate = 100;
-volatile int aem = 12345;
+volatile int refresh_rate = 5;
+volatile int aem = 0;
 volatile uint8_t* results;
 volatile int temperature_cnt = 0;
 volatile int humidity_cnt = 0;
 volatile bool status_called = 0;
-volatile unsigned long int timer = CLK_FREQ /100;
+//volatile unsigned long int timer = CLK_FREQ /100;
+//volatile int timestep = 6000;
+volatile int timer = 840000;
 volatile bool sampling = false;
+volatile int temperature_reset_cnt = 0;
+volatile int humidity_reset_cnt = 0;
 
 // UART RX buffer and queue
 volatile char buff[UART_RX_BUFFER_SIZE];
@@ -81,7 +85,7 @@ int main(void) {
 		//test();
 		system_login();					//Password and AEM logic
     application_loop();    // runs until you want to exit
-    NVIC_SystemReset();    // reset if loop ever returns
+    //NVIC_SystemReset();    // reset if loop ever returns
     while (1) { /* should never get here */ }
 }
 
@@ -98,8 +102,26 @@ static void sample_dht11(void){
                 results[2], results[3]);
         uart_print(msg);
     }
+		// Reset check
+		// Temperature check
+		if (results[2] > 35) {
+			temperature_reset_cnt++;
+		} else {
+			temperature_reset_cnt = 0;	//no consecutive wild values, reset counter
+		}
+		// Humidity check
+		if (results[0] > 80) {
+			humidity_reset_cnt++;
+		} else {
+			humidity_reset_cnt = 0;		//no consecutive wild values, reset counter
+		}
+		// Reset
+		if (temperature_reset_cnt > 2 || humidity_reset_cnt > 2) {
+			free(results);
+			NVIC_SystemReset();    // reset if loop ever returns
+		}
     free(results);
-	}
+}
 
 
 // Initialize GPIO, UART, timer, DHT11, NVIC, etc.
@@ -198,11 +220,44 @@ static void system_login(void) {
 		
 		 // At this point, PIN was correct and you've broken out
     uart_print("PIN accepted. Unlocking...\r\n");
-				
-			
-			
 		
-	
+		//AEM
+		while (1) {
+		uart_print("Enter AEM: ");
+		idx = 0;
+		
+		// collect characters until CR or full
+		do {
+			while (!queue_dequeue(&rx_queue, &rx_char)) {
+				__WFI();
+			}
+			if (rx_char == 0x7F && idx > 0) {
+				// backspace
+				idx--;
+				uart_tx(rx_char);
+			} else if (rx_char != 0x7F) {
+				buff[idx++] = (char)rx_char;
+				uart_tx(rx_char);
+			}
+		} while (rx_char != '\r' && idx < UART_RX_BUFFER_SIZE);
+		
+		// overwrite the '\r' with '\0'
+		if (idx > 0) {
+			buff[idx - 1] = '\0';
+		}
+		uart_print("\r\n");
+		
+		// overflow?
+		if (idx >= UART_RX_BUFFER_SIZE) {
+			uart_print("Stop trying to overflow my buffer! I resent that!\r\n");
+			continue;
+		}
+		
+		break;
+		}
+		aem = atoi(buff);
+		sprintf(buff2,"AEM inserted: %d\r\n", aem);
+		uart_print(buff2);
 }
 
 
@@ -291,12 +346,27 @@ static void application_loop(void) {
 void button_isr(int sources) {
     gpio_set(P_DBG_ISR, 1);
     if ((sources << GET_PIN_INDEX(PA_1)) & (1 << GET_PIN_INDEX(PA_1))) {
-        switch (counter_button) {
-            case 0: uart_print("switch to mode B\r\n"); break;
-            case 1: uart_print("switch to mode A\r\n"); break;
-            case 2: uart_print("calculate new refresh rate\r\n"); break;
-        }
-        counter_button = (counter_button + 1) % 4;
+		if ( (counter_button%2) == 0) {
+			profile = mode_b;
+			uart_print("switch to mode B\r\n");
+		}
+		else {
+			profile = mode_a;
+			uart_print("switch to mode A\r\n");
+		}
+		
+		if ( ((counter_button+1)%3) == 0) {
+			refresh_rate = ( ((aem%100 - aem%10)/10) + aem%10);
+			if (refresh_rate>10) {
+				refresh_rate = 10;
+			}
+			else if (refresh_rate <2) {
+				refresh_rate = 2;
+			}
+			sprintf(buff2, "New refresh rate: %ds\r\n", refresh_rate);
+			uart_print(buff2);
+		}
+        counter_button++;
     }
     gpio_set(P_DBG_ISR, 0);
 }
@@ -304,10 +374,14 @@ void button_isr(int sources) {
 // Periodic timer ISR
 void timer_isr(void) {
     // TODO: periodic activity (e.g., call dht_print, alert_mode)
-	if(ticks == refresh_rate){
+	//sample_dht11();
+	if( (ticks%refresh_rate) == 0){
 		sample_dht11();
-		ticks = 0;
+		//ticks = 0;
+		uart_print("sample++;\r\n");
 	}
+	sprintf(buff2,"tick: %d", ticks);
+	uart_print(buff2);
 	ticks++;
 	//test();
 	
@@ -350,14 +424,15 @@ void alert_mode(void) {
 
 static void increment_sampling() {
     // only allow up to 10 seconds
-    if (refresh_rate < 100) {
-        refresh_rate += 10;                 // bump by 1 s (in CPU cycles)
-        timer_disable();
-        timer_init(timer);
-        timer_set_callback(timer_isr);
-        timer_enable();
+    if (refresh_rate < 10) {
+        refresh_rate++;                 // bump by 1 s (in CPU cycles)
+//        timer_disable();
+//        timer_init(timer);
+//        timer_set_callback(timer_isr);
+//        timer_enable();
         char msg[64];
-        sprintf(msg, "Sampling rate set to %lu s\r\n", timer / (CLK_FREQ_TRUE/100));
+//        sprintf(msg, "Sampling rate set to %lu s\r\n", timer / (CLK_FREQ_TRUE/100));
+				sprintf(msg, "Sampling rate set to %d s\r\n", refresh_rate);
         uart_print(msg);
     } else {
         uart_print("Error: maximum sampling interval is 10 s\r\n");
@@ -366,15 +441,16 @@ static void increment_sampling() {
 
 static void decrement_sampling() {
     // only allow down to 1 second
-    if (timer > 10) {
-        timer -= 10;                 // bump down by 1 s (in CPU cycles)
-        timer_disable();
-        timer_init(timer);
-        timer_set_callback(timer_isr);
-        timer_enable();
+    if (refresh_rate > 2) {
+        refresh_rate--;                 // bump down by 1 s (in CPU cycles)
+//        timer_disable();
+//        timer_init(timer);
+//        timer_set_callback(timer_isr);
+//        timer_enable();
         char msg[64];
-        sprintf(msg, "Sampling rate set to %lu s\r\n", timer / (CLK_FREQ_TRUE/100));
-        uart_print(msg);
+//        sprintf(msg, "Sampling rate set to %lu s\r\n", timer / (CLK_FREQ_TRUE/100));
+        sprintf(msg, "Sampling rate set to %d s\r\n", refresh_rate);
+				uart_print(msg);
     } else {
         uart_print("Error: minimum sampling interval is 1 s\r\n");
     }
@@ -397,4 +473,3 @@ void status_report(void) {
 void uart_rx_isr(uint8_t rx) {
     queue_enqueue(&rx_queue, rx);
 }
-
