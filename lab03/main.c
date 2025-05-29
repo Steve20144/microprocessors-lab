@@ -22,6 +22,14 @@
 #define LED_PIN               PA_4
 #define PINCODE 							123
 
+typedef enum {
+    TEMP_MODE,
+    HUM_MODE,
+    BOTH_MODE
+} display_mode_t;
+
+volatile display_mode_t disp_mode = TEMP_MODE;
+
 typedef enum { mode_a, mode_b } mode_profile;
 volatile mode_profile profile = mode_a;
 volatile uint64_t ticks =0;
@@ -67,36 +75,51 @@ int main(void) {
 
 // ------------------------------------------------------------------------------------------------
 //DHT11 Sample and print
-static void sample_dht11(void){
-	// --- One-shot DHT11 test read ---
+static void sample_dht11(void) {
+    // --- One-shot DHT11 read ---
     results = dht11_poll();
-    {
-        char msg[64];
-        sprintf(msg,
-                "Humidity: %d.%d%%RH\r\nTemperature: %d.%dC\r\n",
-                results[0], results[1],
-                results[2], results[3]);
-        uart_print(msg);
+
+    char msg[64];
+    switch (disp_mode) {
+        case TEMP_MODE:
+            // Only temperature
+            sprintf(msg, "Temperature: %d.%dC\r\n",
+                    results[2], results[3]);
+            break;
+        case HUM_MODE:
+            // Only humidity
+            sprintf(msg, "Humidity: %d.%d%%RH\r\n",
+                    results[0], results[1]);
+            break;
+        case BOTH_MODE:
+        default:
+            // Both temperature and humidity
+            sprintf(msg,
+                    "Humidity: %d.%d%%RH\r\n"
+                    "Temperature: %d.%dC\r\n",
+                    results[0], results[1],
+                    results[2], results[3]);
+            break;
     }
-		// Reset check
-		// Temperature check
-		if (results[2] > 35) {
-			temperature_reset_cnt++;
-		} else {
-			temperature_reset_cnt = 0;	//no consecutive wild values, reset counter
-		}
-		// Humidity check
-		if (results[0] > 80) {
-			humidity_reset_cnt++;
-		} else {
-			humidity_reset_cnt = 0;		//no consecutive wild values, reset counter
-		}
-		// Reset
-		if (temperature_reset_cnt > 2 || humidity_reset_cnt > 2) {
-			free(results);
-			NVIC_SystemReset();    // reset if loop ever returns
-		}
-    //free(results);
+    uart_print(msg);
+
+    // Reset counters on wild values
+    if (results[2] > 35) {
+        temperature_reset_cnt++;
+    } else {
+        temperature_reset_cnt = 0;
+    }
+    if (results[0] > 80) {
+        humidity_reset_cnt++;
+    } else {
+        humidity_reset_cnt = 0;
+    }
+    if (temperature_reset_cnt > 2 || humidity_reset_cnt > 2) {
+        free(results);
+        NVIC_SystemReset();
+    }
+
+    // free(results);  // if you prefer to free here instead of in timer
 }
 
 
@@ -292,8 +315,16 @@ static void application_loop(void) {
                 break;
             case 'c':
             case 'C':
-                //option_c();
-                break;
+                 // cycle through TEMP ? HUM ? BOTH ? TEMP …
+            disp_mode = (disp_mode == BOTH_MODE)
+                        ? TEMP_MODE
+                        : (display_mode_t)(disp_mode + 1);
+            // acknowledge
+            const char* names[] = { "TEMP", "HUM", "BOTH" };
+            char msg[32];
+            sprintf(msg, "Display mode: %s\r\n", names[disp_mode]);
+            uart_print(msg);
+            break;
             case 'd':
             case 'D':
 							sampling = true;
