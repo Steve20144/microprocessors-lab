@@ -39,7 +39,7 @@ static int wait_pin_state(Pin pin, int level, uint32_t timeout_us) {
 uint8_t* dht11_poll() {
 		static uint8_t data_out[6];	//the sixth element contains debug info
     int retry = 0;
-    delay_ms(3000);
+    //delay_ms(3000);
 		uint8_t bit_array[40];
 		static uint8_t byte_array[5];
 
@@ -103,10 +103,10 @@ uint8_t* dht11_poll() {
         }
 
 				//data_out print-debug
-				for (int k=0; k<5; k++) {
-					sprintf(buf1,"data_out[%d]: %d\r\n", k, data_out[k]);
-					uart_print(buf1);
-				}
+//				for (int k=0; k<5; k++) {
+//					sprintf(buf1,"data_out[%d]: %d\r\n", k, data_out[k]);
+//					uart_print(buf1);
+//				}
 
         // 5) Verify checksum
         uint8_t sum = data_out[0] + data_out[1] + data_out[2] + data_out[3];
@@ -116,13 +116,13 @@ uint8_t* dht11_poll() {
         }
         
         uart_print("DHT11: Checksum error, retrying...\r\n");
-        delay_ms(100); // Wait before retry
+        //delay_ms(100); // Wait before retry
 				
-				//data_out print
-				for (int k=0; k<5; k++) {
-					sprintf(buf1,"data_out[%d]: %d\r\n", k, data_out[k]);
-					uart_print(buf1);
-				}
+				//data_out print DEBUG
+//				for (int k=0; k<5; k++) {
+//					sprintf(buf1,"data_out[%d]: %d\r\n", k, data_out[k]);
+//					uart_print(buf1);
+//				}
 				
 //				//byte_array calc
 //				for (int i = 0; i < 5; i++) byte_array[i] = 0;
