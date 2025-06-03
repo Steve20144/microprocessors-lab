@@ -458,7 +458,7 @@ static void decrement_sampling() {
         sprintf(buff2, "Sampling rate set to %d s\r\n", refresh_rate);
 				uart_print(buff2);
     } else {
-        uart_print("Error: minimum sampling interval is 1 s\r\n");
+        uart_print("Error: minimum sampling interval is 2 s\r\n");
     }
 }
 
@@ -470,6 +470,7 @@ void status_report(void) {
         } else {
             uart_print("Mode B\r\n");
         }
+				sample_dht11();
         sprintf(buff2, "Profile switches: %d\r\n", counter_button);
         uart_print(buff2);
 //    }
